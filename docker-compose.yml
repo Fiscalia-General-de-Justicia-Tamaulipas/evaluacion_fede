@@ -16,8 +16,13 @@ services:
   frontend:
     build: ./frontend
     container_name: evaluacion_fede_frontend
+    env_file:
+      - .env
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
     volumes:
       - ./frontend:/app
+      - ./.env:/app/.env:ro
       - /app/node_modules
     depends_on:
       - api

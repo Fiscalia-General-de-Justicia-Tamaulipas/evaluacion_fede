@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { ChevronLeft, ChevronRight, CheckCircle2, ShieldCheck, PlayCircle, ClipboardCheck, LockKeyhole, RotateCcw } from 'lucide-vue-next';
 
 type Option = { id: number; letter: string; text: string }; type Question = { id: number; number: number; text: string; options: Option[] };
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API = import.meta.env.VITE_API_URL;
 const stage = ref<'intro' | 'identity' | 'exam' | 'result'>('intro'); const videoDone = ref(false); const videoStarted = ref(false); const evaluationId = ref<number | null>(null); const questions = ref<Question[]>([]); const current = ref(0); const answers = ref<Record<number, number>>({}); const loading = ref(false); const result = ref({ score: 0, correct: 0, total: 0 });
 const form = ref({ first_name: '', paternal_surname: '', maternal_surname: '' });
 const q = computed(() => questions.value[current.value]); const answeredCount = computed(() => Object.keys(answers.value).length); const progress = computed(() => questions.value.length ? ((current.value + 1) / questions.value.length) * 100 : 0); const canNext = computed(() => q.value && answers.value[q.value.id] != null); const fullName = computed(() => `${form.value.first_name} ${form.value.paternal_surname} ${form.value.maternal_surname}`.trim());
