@@ -1,14 +1,45 @@
 from datetime import datetime, timezone
 import os
+import time
+from pathlib import Path
+from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, String, Boolean, DateTime, ForeignKey, Integer, Text, select
+from sqlalchemy import create_engine, String, Boolean, DateTime, ForeignKey, Integer, Text, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session, sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./evaluacion.db")
+for env_path in [
+    Path.cwd() / '.env',
+    Path(__file__).resolve().parents[2] / '.env',
+    Path('/app/.env'),
+]:
+    if env_path.exists():
+        load_dotenv(env_path)
+        break
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("La variable DATABASE_URL no está configurada en el archivo .env.")
+
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+
+def wait_for_database(max_attempts: int = 30, delay_seconds: int = 2):
+    last_error = None
+    for _ in range(max_attempts):
+        try:
+            with engine.connect() as connection:
+                connection.execute(text('SELECT 1'))
+            return
+        except Exception as exc:
+            last_error = exc
+            time.sleep(delay_seconds)
+    raise RuntimeError('No se pudo conectar a la base de datos MySQL.') from last_error
+
+
+wait_for_database()
 
 class Base(DeclarativeBase): pass
 class Question(Base):

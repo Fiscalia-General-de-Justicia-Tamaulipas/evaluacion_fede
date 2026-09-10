@@ -1,27 +1,33 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: mysql:8.0
     container_name: evaluacion_fede_db
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: evaluacion_fede
-      POSTGRES_USER: evaluacion
-      POSTGRES_PASSWORD: evaluacion_secret
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U evaluacion -d evaluacion_fede"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u${MYSQL_USER} -p${MYSQL_PASSWORD} --silent"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
 
   api:
     build: ./backend
     container_name: evaluacion_fede_api
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql+psycopg://evaluacion:evaluacion_secret@db:5432/evaluacion_fede
-      CORS_ORIGINS: http://localhost:5173
+      DATABASE_URL: ${DATABASE_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
     volumes:
       - ./backend:/app
+      - ./.env:/app/.env:ro
     depends_on:
       db:
         condition: service_healthy
@@ -40,4 +46,4 @@ services:
       - "5173:5173"
 
 volumes:
-  postgres_data:
+  mysql_data:

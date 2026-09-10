@@ -3,9 +3,22 @@
 Plataforma institucional de capacitación y evaluación para el curso **Delitos Electorales y su investigación en el contexto de los Procesos Electorales Locales**, Módulo 1.
 
 ## Stack
-- FastAPI + SQLAlchemy + PostgreSQL
+- FastAPI + SQLAlchemy + MySQL
 - Vue 3 + TypeScript + Tailwind CSS + Vite
 - Docker Compose
+
+## Configuración local
+
+Crea un archivo `.env` en la raíz del proyecto con estos valores:
+
+```env
+MYSQL_DATABASE=evaluacion_fede
+MYSQL_USER=evaluacion
+MYSQL_PASSWORD=evaluacion_secret
+MYSQL_ROOT_PASSWORD=root_secret
+DATABASE_URL=mysql+pymysql://evaluacion:evaluacion_secret@db:3306/evaluacion_fede?charset=utf8mb4
+CORS_ORIGINS=http://localhost:5173
+```
 
 ## Arranque
 
@@ -27,7 +40,7 @@ Reemplaza `frontend/public/demo.mp4` por el video institucional real, conservand
 - Examen tipo slides, una pregunta por pantalla.
 - Regreso a preguntas anteriores y modificación de respuestas.
 - Indicador de progreso y mapa de preguntas.
-- Persistencia de evaluación y respuestas en PostgreSQL.
+- Persistencia de evaluación y respuestas en MySQL.
 - Calificación automática.
 - Registro de inicio/finalización.
 
