@@ -18,6 +18,9 @@ function restart() { location.reload() }
 onMounted(loadQuestions)
 </script>
 <template>
+    <header>
+        <title>Evaluación de capacitación - Fiscalía Especializada en Delitos Electorales</title>
+    </header>
     <div class="min-h-screen bg-[#f4f4f3] text-[#575756]">
         <header class="border-b border-[#dadada] bg-white/95 backdrop-blur sticky top-0 z-20">
             <div class="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4">
@@ -157,36 +160,24 @@ onMounted(loadQuestions)
                             i + 1 }}</button>
                 </div>
             </section>
-            <section v-else class="mx-auto max-w-2xl">
+            <section v-else class="mx-auto max-w-3xl">
                 <div
-                    class="overflow-hidden rounded-3xl border border-[#dadada] bg-white text-center shadow-xl shadow-black/5">
-                    <div class="bg-[#575756] px-6 py-12 text-white">
+                    class="overflow-hidden rounded-[32px] border border-[#dadada] bg-white text-center shadow-xl shadow-black/5">
+                    <div class="bg-[#575756] px-6 py-14 text-white">
                         <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10">
                             <ClipboardCheck :size="34" />
                         </div>
-                        <p class="mt-5 text-xs font-bold uppercase tracking-[.25em] text-white/70">Evaluación registrada
-                        </p>
-                        <h2 class="mt-2 text-3xl font-black">¡Evaluación finalizada!</h2>
+                        <p class="mt-5 text-xs font-bold uppercase tracking-[.25em] text-white/70">Finalización</p>
+                        <h2 class="mt-2 text-3xl font-black md:text-4xl">¡Evaluación finalizada!</h2>
                     </div>
                     <div class="p-8 md:p-10">
-                        <p class="text-sm text-[#878787]">Participante</p>
-                        <p class="mt-1 text-lg font-bold">{{ fullName }}</p>
-                        <div class="my-8 text-6xl font-black">{{ result.score }}<span
-                                class="text-2xl text-[#878787]">%</span></div>
-                        <p class="text-sm text-[#878787]">{{ result.correct }} respuestas correctas de {{ result.total
-                            }}
+                        <p class="text-lg font-bold text-[#575756]">{{ fullName || 'Participante registrado' }}</p>
+                        <p class="mt-4 text-base leading-7 text-[#878787]">
+                            Gracias por completar el módulo de capacitación. Tu participación ha sido registrada de forma
+                            exitosa en la plataforma institucional.
                         </p>
-                        <div class="mt-8 grid grid-cols-2 gap-3">
-                            <div class="rounded-2xl bg-[#f4f4f3] p-4">
-                                <p class="text-xs text-[#878787]">Aciertos</p>
-                                <p class="mt-1 text-xl font-black">{{ result.correct }}</p>
-                            </div>
-                            <div class="rounded-2xl bg-[#f4f4f3] p-4">
-                                <p class="text-xs text-[#878787]">Preguntas</p>
-                                <p class="mt-1 text-xl font-black">{{ result.total }}</p>
-                            </div>
-                        </div><button @click="restart"
-                            class="mt-7 inline-flex items-center gap-2 rounded-xl border border-[#dadada] px-5 py-3 text-sm font-bold hover:bg-[#f4f4f3]">
+                        <button @click="restart"
+                            class="mt-8 inline-flex items-center gap-2 rounded-xl bg-[#575756] px-5 py-3 text-sm font-bold text-white hover:bg-[#454544]">
                             <RotateCcw :size="17" /> Nueva evaluación
                         </button>
                     </div>
