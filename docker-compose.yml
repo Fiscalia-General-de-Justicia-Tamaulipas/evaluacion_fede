@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: evaluacion_fede_db
+    environment:
+      POSTGRES_DB: evaluacion_fede
+      POSTGRES_USER: evaluacion
+      POSTGRES_PASSWORD: evaluacion_secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evaluacion -d evaluacion_fede"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    container_name: evaluacion_fede_api
+    environment:
+      DATABASE_URL: postgresql+psycopg://evaluacion:evaluacion_secret@db:5432/evaluacion_fede
+      CORS_ORIGINS: http://localhost:5173
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    container_name: evaluacion_fede_frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:
