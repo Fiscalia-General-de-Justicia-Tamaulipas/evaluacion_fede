@@ -57,7 +57,7 @@ onMounted(loadQuestions)
                         <div class="overflow-hidden rounded-[26px] bg-[#575756]">
                             <video class="block aspect-video w-full object-cover" controls playsinline
                                 preload="metadata" @play="videoStarted = true" @ended="videoEnded">
-                                <source src="/demo.mp4" type="video/mp4" />Tu navegador no soporta video HTML5.
+                                <source src="/curso-modulo1.mp4" type="video/mp4" />Tu navegador no soporta video HTML5.
                             </video>
                         </div>
                         <div
