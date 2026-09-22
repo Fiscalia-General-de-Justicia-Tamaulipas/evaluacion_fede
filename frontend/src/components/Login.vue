@@ -281,12 +281,12 @@ onBeforeUnmount(() => {
         <div class="relative z-10 px-12 pt-12 xl:px-16">
           <div class="flex items-center gap-4">
             <div
-              class="flex h-12 items-center rounded-xl bg-white px-4 shadow-2xl shadow-black/20"
+              class="flex h-20 items-center rounded-xl bg-white px-4 shadow-2xl shadow-black/20"
             >
               <img
                 src="/logo_fgjtam.png"
                 alt="Fiscalía General de Justicia de Tamaulipas"
-                class="h-8 w-auto object-contain"
+                class="h-15 w-auto object-contain"
               />
             </div>
 
@@ -295,7 +295,7 @@ onBeforeUnmount(() => {
             <img
               src="/logo_fede.png"
               alt="FEDE"
-              class="h-10 w-auto object-contain brightness-0 invert opacity-90"
+              class="h-15 w-auto object-contain brightness-0 invert opacity-90"
             />
           </div>
         </div>

@@ -121,15 +121,9 @@ async function register(payload: {
     throw new Error(extractErrorMessage(data, 'No se pudo completar el registro.'));
   }
 
-  persist(data.access_token, data.user);
   return data.user as AuthUser;
 }
 
-async function fetchInstitutions(): Promise<Institution[]> {
-  const response = await fetch(`${API}/api/institutions`);
-  if (!response.ok) throw new Error('No se pudo cargar el catálogo de instituciones.');
-  return response.json();
-}
 
 function logout() {
   clear();
@@ -144,7 +138,6 @@ export function useAuth() {
     login,
     register,
     logout,
-    fetchInstitutions,
     apiFetch,
   };
 }

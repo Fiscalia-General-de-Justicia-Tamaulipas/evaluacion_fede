@@ -12,5 +12,5 @@ const authView = ref<'login' | 'register'>('login');
 <template>
   <ExamFlow v-if="isAuthenticated" />
   <Login v-else-if="authView === 'login'" @go-register="authView = 'register'" />
-  <Register v-else @go-login="authView = 'login'" />
+  <Register v-else @go-login="authView = 'login'" @success="authView = 'login'" />
 </template>

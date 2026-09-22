@@ -1,4 +1,5 @@
 <script setup lang="ts">
+
 import {
     computed,
     onMounted,
@@ -9,7 +10,6 @@ import {
 import {
     ChevronLeft,
     ChevronRight,
-    ChevronDown,
     CheckCircle2,
     PlayCircle,
     ClipboardCheck,
@@ -20,22 +20,81 @@ import {
     X,
 } from 'lucide-vue-next';
 
-import * as pdfjsLib from 'pdfjs-dist';
-
 import { useAuth } from '../lib/auth';
 
 
 /* =========================================================
-   PDF.JS WORKER
-========================================================= */
+   PDF.JS
+   ========================================================= */
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+const PDFJS_VERSION = '4.7.76';
+
+const PDFJS_SCRIPT_URL =
+    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`;
+
+const PDFJS_WORKER_URL =
+    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
+
+let pdfjsLoadPromise: Promise<any> | null = null;
+
+function loadPdfJs(): Promise<any> {
+
+    const existing = (window as any).pdfjsLib;
+
+    if (existing) {
+        return Promise.resolve(existing);
+    }
+
+    if (pdfjsLoadPromise) {
+        return pdfjsLoadPromise;
+    }
+
+    pdfjsLoadPromise = new Promise((resolve, reject) => {
+
+        const script = document.createElement('script');
+
+        script.src = PDFJS_SCRIPT_URL;
+
+        script.onload = () => {
+
+            const lib = (window as any).pdfjsLib;
+
+            if (!lib) {
+                reject(
+                    new Error(
+                        'pdf.js no se expuso correctamente en window.'
+                    )
+                );
+
+                return;
+            }
+
+            lib.GlobalWorkerOptions.workerSrc =
+                PDFJS_WORKER_URL;
+
+            resolve(lib);
+        };
+
+        script.onerror = () => {
+
+            reject(
+                new Error(
+                    'No se pudo cargar pdf.js desde el CDN.'
+                )
+            );
+
+        };
+
+        document.head.appendChild(script);
+    });
+
+    return pdfjsLoadPromise;
+}
 
 
 /* =========================================================
    TYPES
-========================================================= */
+   ========================================================= */
 
 type Option = {
     id: number;
@@ -93,7 +152,7 @@ type Result = {
 
 /* =========================================================
    AUTH
-========================================================= */
+   ========================================================= */
 
 const {
     user,
@@ -105,7 +164,7 @@ const {
 
 /* =========================================================
    STATE
-========================================================= */
+   ========================================================= */
 
 const stage = ref<
     'intro' |
@@ -115,17 +174,13 @@ const stage = ref<
 
 const videoDone = ref(false);
 
-const evaluationId = ref<
-    number | null
->(null);
+const evaluationId = ref<number | null>(null);
 
 const questions = ref<Question[]>([]);
 
 const current = ref(0);
 
-const answers = ref<
-    Record<number, number>
->({});
+const answers = ref<Record<number, number>>({});
 
 const loading = ref(false);
 
@@ -139,50 +194,52 @@ const result = ref<Result>({
 
 
 /* =========================================================
-   SUPPORT DOCUMENTS STATE
-========================================================= */
+   SUPPORT DOCUMENTS
+   ========================================================= */
 
-/*
- * Ajusta esta lista con los PDF reales del módulo.
- * Las rutas deben apuntar a archivos servidos por el
- * proyecto (por ejemplo, dentro de /public/docs/...).
- */
 const supportDocuments = ref<SupportDocument[]>([
     {
         id: 1,
         title: 'Elecciones y democracia',
         url: '/docs/Elecciones y Democracia.pdf',
     },
+
     {
         id: 2,
         title: 'Ley de Medios de Impugnacion Electorales',
         url: '/docs/Ley de Medios de Impugnacion Electorales 29-mayo-2025-2.pdf',
     },
+
     {
         id: 3,
         title: 'Ley Electoral del Estado de Tamaulipas',
         url: '/docs/Ley Electoral del Estado de Tamaulipas 29-mayo-2026-1-.pdf',
     },
+
     {
         id: 4,
         title: 'Ley General en Materia de Delitos Electorales',
         url: '/docs/LGMDE_200521 (2).pdf',
     },
+
     {
         id: 5,
         title: 'Constitución Política de los Estados Unidos Mexicanos',
         url: '/docs/CPEUM.pdf',
     },
+
     {
         id: 6,
         title: 'Ley General de Partidos Politicos',
         url: '/docs/LGPP (1).pdf',
     },
+
     {
         id: 7,
         title: 'Derecho Electoral Mexicano',
         url: '/docs/derecho electoral mexicano.pdf',
     },
+
     {
         id: 8,
         title: 'Derecho Humano al Voto',
@@ -190,32 +247,46 @@ const supportDocuments = ref<SupportDocument[]>([
     },
 ]);
 
+
+/* =========================================================
+   PDF SIDEBAR STATE
+   ========================================================= */
+
 const docsMenuOpen = ref(false);
 
 const docsMenuRef = ref<HTMLElement | null>(null);
 
 const viewingDoc = ref<SupportDocument | null>(null);
 
-const thumbnails = ref<
-    Record<number, string>
->({});
+const thumbnails = ref<Record<number, string>>({});
+
+let hoverCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+const showDocsMenu = computed(() => {
+
+    return (
+        stage.value !== 'exam' &&
+        supportDocuments.value.length > 0
+    );
+
+});
 
 
 /* =========================================================
    COMPUTED
-========================================================= */
+   ========================================================= */
 
 const q = computed(() => {
-    return questions.value[
-        current.value
-    ];
+
+    return questions.value[current.value];
+
 });
 
 
 const answeredCount = computed(() => {
-    return Object.keys(
-        answers.value
-    ).length;
+
+    return Object.keys(answers.value).length;
+
 });
 
 
@@ -226,11 +297,11 @@ const progress = computed(() => {
     }
 
     return (
-        (
-            (current.value + 1) /
-            questions.value.length
-        ) * 100
+        ((current.value + 1) /
+            questions.value.length) *
+        100
     );
+
 });
 
 
@@ -240,9 +311,8 @@ const canNext = computed(() => {
         return false;
     }
 
-    return (
-        answers.value[q.value.id] != null
-    );
+    return answers.value[q.value.id] != null;
+
 });
 
 
@@ -251,8 +321,9 @@ const isLastQuestion = computed(() => {
     return (
         questions.value.length > 0 &&
         current.value ===
-        questions.value.length - 1
+            questions.value.length - 1
     );
+
 });
 
 
@@ -261,27 +332,29 @@ const allAnswered = computed(() => {
     return (
         questions.value.length > 0 &&
         answeredCount.value ===
-        questions.value.length
+            questions.value.length
     );
+
 });
 
 
 /* =========================================================
    LOAD QUESTIONS
-========================================================= */
+   ========================================================= */
 
 async function loadQuestions() {
 
     try {
 
-        const response = await apiFetch(
-            '/api/questions'
-        );
+        const response =
+            await apiFetch('/api/questions');
 
         if (!response.ok) {
+
             throw new Error(
                 'No se pudieron cargar las preguntas.'
             );
+
         }
 
         questions.value =
@@ -300,14 +373,17 @@ async function loadQuestions() {
 
 
 /* =========================================================
-   SUPPORT DOCUMENTS: THUMBNAILS
-========================================================= */
+   PDF THUMBNAILS
+   ========================================================= */
 
 async function generateThumbnail(
     doc: SupportDocument
 ) {
 
     try {
+
+        const pdfjsLib =
+            await loadPdfJs();
 
         const loadingTask =
             pdfjsLib.getDocument(doc.url);
@@ -324,12 +400,13 @@ async function generateThumbnail(
             });
 
         const canvas =
-            document.createElement(
-                'canvas'
-            );
+            document.createElement('canvas');
 
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        canvas.width =
+            viewport.width;
+
+        canvas.height =
+            viewport.height;
 
         const context =
             canvas.getContext('2d');
@@ -352,6 +429,7 @@ async function generateThumbnail(
             `Error generando miniatura de "${doc.title}":`,
             error
         );
+
     }
 }
 
@@ -361,17 +439,61 @@ function generateAllThumbnails() {
     supportDocuments.value.forEach(
         (doc) => generateThumbnail(doc)
     );
+
 }
 
 
 /* =========================================================
-   SUPPORT DOCUMENTS: MENU + VIEWER
-========================================================= */
+   PDF SIDEBAR
+   ========================================================= */
+
+function openDocsMenu() {
+
+    if (hoverCloseTimer) {
+
+        clearTimeout(hoverCloseTimer);
+
+        hoverCloseTimer = null;
+
+    }
+
+    docsMenuOpen.value = true;
+
+}
+
+
+function closeDocsMenu() {
+
+    if (hoverCloseTimer) {
+
+        clearTimeout(hoverCloseTimer);
+
+    }
+
+    hoverCloseTimer = setTimeout(() => {
+
+        docsMenuOpen.value = false;
+
+        hoverCloseTimer = null;
+
+    }, 150);
+
+}
+
 
 function toggleDocsMenu() {
 
+    if (hoverCloseTimer) {
+
+        clearTimeout(hoverCloseTimer);
+
+        hoverCloseTimer = null;
+
+    }
+
     docsMenuOpen.value =
         !docsMenuOpen.value;
+
 }
 
 
@@ -380,13 +502,16 @@ function openDocument(
 ) {
 
     viewingDoc.value = doc;
+
     docsMenuOpen.value = false;
+
 }
 
 
 function closeViewer() {
 
     viewingDoc.value = null;
+
 }
 
 
@@ -400,8 +525,11 @@ function handleClickOutside(
             event.target as Node
         )
     ) {
+
         docsMenuOpen.value = false;
+
     }
+
 }
 
 
@@ -412,30 +540,33 @@ function handleEscape(
     if (event.key === 'Escape') {
 
         docsMenuOpen.value = false;
+
         viewingDoc.value = null;
+
     }
+
 }
 
 
 /* =========================================================
    RESTORE ANSWERS
-========================================================= */
+   ========================================================= */
 
 function restoreAnswers(
     savedAnswers: SavedAnswer[]
 ) {
 
-    const restored:
-        Record<number, number> = {};
+    const restored: Record<
+        number,
+        number
+    > = {};
 
-    for (
-        const answer
-        of savedAnswers
-    ) {
+    for (const answer of savedAnswers) {
 
         restored[
             answer.question_id
         ] = answer.option_id;
+
     }
 
     answers.value = restored;
@@ -444,15 +575,16 @@ function restoreAnswers(
 
 /* =========================================================
    RESTORE CURRENT EVALUATION
-========================================================= */
+   ========================================================= */
 
 async function restoreEvaluation() {
 
     try {
 
-        const response = await apiFetch(
-            '/api/evaluations/current'
-        );
+        const response =
+            await apiFetch(
+                '/api/evaluations/current'
+            );
 
         if (!response.ok) {
             return;
@@ -482,30 +614,27 @@ async function restoreEvaluation() {
             evaluation.answers ?? []
         );
 
-        /*
-         * Si ya terminó el video,
-         * podemos entrar directamente
-         * al examen.
-         */
         if (
             evaluation.video_completed
         ) {
 
             stage.value = 'exam';
 
-            if (
-                questions.value.length > 0
-            ) {
+            if (questions.value.length > 0) {
 
                 current.value =
                     Math.min(
                         Math.max(
-                            evaluation.current_question ?? 0,
+                            evaluation.current_question ??
+                                0,
                             0
                         ),
-                        questions.value.length - 1
+                        questions.value.length -
+                            1
                     );
+
             }
+
         }
 
     } catch (error) {
@@ -514,23 +643,25 @@ async function restoreEvaluation() {
             'Error recuperando evaluación:',
             error
         );
+
     }
 }
 
 
 /* =========================================================
    VIDEO
-========================================================= */
+   ========================================================= */
 
 function videoEnded() {
 
     videoDone.value = true;
+
 }
 
 
 /* =========================================================
    START / RESUME EXAM
-========================================================= */
+   ========================================================= */
 
 async function startExam() {
 
@@ -556,13 +687,15 @@ async function startExam() {
         if (!response.ok) {
 
             const errorData =
-                await response.json()
+                await response
+                    .json()
                     .catch(() => null);
 
             throw new Error(
                 errorData?.detail ||
-                'No se pudo iniciar la evaluación.'
+                    'No se pudo iniciar la evaluación.'
             );
+
         }
 
         const data:
@@ -572,16 +705,10 @@ async function startExam() {
         evaluationId.value =
             data.evaluation_id;
 
-        /*
-         * Recuperar respuestas.
-         */
         restoreAnswers(
             data.answers ?? []
         );
 
-        /*
-         * Recuperar pregunta actual.
-         */
         if (
             questions.value.length > 0
         ) {
@@ -589,18 +716,16 @@ async function startExam() {
             current.value =
                 Math.min(
                     Math.max(
-                        data.current_question ?? 0,
+                        data.current_question ??
+                            0,
                         0
                     ),
-                    questions.value.length - 1
+                    questions.value.length -
+                        1
                 );
+
         }
 
-        /*
-         * Si el backend todavía no
-         * tiene registrado el video,
-         * lo marcamos.
-         */
         if (!data.video_completed) {
 
             const videoResponse =
@@ -616,7 +741,9 @@ async function startExam() {
                 throw new Error(
                     'No se pudo registrar el video completado.'
                 );
+
             }
+
         }
 
         videoDone.value = true;
@@ -633,13 +760,14 @@ async function startExam() {
     } finally {
 
         loading.value = false;
+
     }
 }
 
 
 /* =========================================================
    SAVE ANSWER
-========================================================= */
+   ========================================================= */
 
 async function selectOption(
     optionId: number
@@ -656,9 +784,6 @@ async function selectOption(
     const questionId =
         q.value.id;
 
-    /*
-     * UI inmediata.
-     */
     answers.value[
         questionId
     ] = optionId;
@@ -691,13 +816,15 @@ async function selectOption(
         if (!response.ok) {
 
             const errorData =
-                await response.json()
+                await response
+                    .json()
                     .catch(() => null);
 
             throw new Error(
                 errorData?.detail ||
-                'No se pudo guardar la respuesta.'
+                    'No se pudo guardar la respuesta.'
             );
+
         }
 
     } catch (error) {
@@ -707,11 +834,6 @@ async function selectOption(
             error
         );
 
-        /*
-         * Si el servidor rechazó
-         * la respuesta, quitarla
-         * del estado local.
-         */
         delete answers.value[
             questionId
         ];
@@ -719,13 +841,14 @@ async function selectOption(
     } finally {
 
         savingAnswer.value = false;
+
     }
 }
 
 
 /* =========================================================
    SAVE CURRENT QUESTION
-========================================================= */
+   ========================================================= */
 
 async function saveCurrentProgress(
     position = current.value
@@ -760,6 +883,7 @@ async function saveCurrentProgress(
             console.error(
                 'No se pudo guardar la posición.'
             );
+
         }
 
     } catch (error) {
@@ -768,13 +892,14 @@ async function saveCurrentProgress(
             'Error guardando posición:',
             error
         );
+
     }
 }
 
 
 /* =========================================================
    PREVIOUS
-========================================================= */
+   ========================================================= */
 
 async function previous() {
 
@@ -785,12 +910,13 @@ async function previous() {
     current.value--;
 
     await saveCurrentProgress();
+
 }
 
 
 /* =========================================================
    NEXT
-========================================================= */
+   ========================================================= */
 
 async function next() {
 
@@ -808,12 +934,13 @@ async function next() {
     current.value++;
 
     await saveCurrentProgress();
+
 }
 
 
 /* =========================================================
    DIRECT QUESTION NAVIGATION
-========================================================= */
+   ========================================================= */
 
 async function goToQuestion(
     index: number
@@ -829,12 +956,13 @@ async function goToQuestion(
     current.value = index;
 
     await saveCurrentProgress();
+
 }
 
 
 /* =========================================================
    FINISH
-========================================================= */
+   ========================================================= */
 
 async function finish() {
 
@@ -862,10 +990,6 @@ async function finish() {
                             'application/json',
                     },
 
-                    /*
-                     * El backend calcula el resultado
-                     * desde las respuestas almacenadas.
-                     */
                     body: JSON.stringify({
                         answers: [],
                     }),
@@ -879,19 +1003,15 @@ async function finish() {
 
             throw new Error(
                 data.detail ||
-                'No se pudo finalizar la evaluación.'
+                    'No se pudo finalizar la evaluación.'
             );
+
         }
 
         result.value = {
-            score:
-                data.score,
-
-            correct:
-                data.correct,
-
-            total:
-                data.total,
+            score: data.score,
+            correct: data.correct,
+            total: data.total,
         };
 
         stage.value = 'result';
@@ -906,66 +1026,62 @@ async function finish() {
     } finally {
 
         loading.value = false;
+
     }
 }
 
 
 /* =========================================================
    RESTART
-========================================================= */
+   ========================================================= */
 
 function restart() {
 
     window.location.reload();
+
 }
 
 
 /* =========================================================
    INITIALIZATION
-========================================================= */
+   ========================================================= */
 
-onMounted(
-    async () => {
+onMounted(async () => {
 
-        document.addEventListener(
-            'click',
-            handleClickOutside
+    document.addEventListener(
+        'click',
+        handleClickOutside
+    );
+
+    document.addEventListener(
+        'keydown',
+        handleEscape
+    );
+
+    generateAllThumbnails();
+
+    loading.value = true;
+
+    try {
+
+        await loadQuestions();
+
+        await restoreEvaluation();
+
+    } catch (error) {
+
+        console.error(
+            'Error inicializando examen:',
+            error
         );
 
-        document.addEventListener(
-            'keydown',
-            handleEscape
-        );
+    } finally {
 
-        generateAllThumbnails();
+        loading.value = false;
 
-        loading.value = true;
-
-        try {
-
-            /*
-             * Primero cargar preguntas.
-             */
-            await loadQuestions();
-
-            /*
-             * Después recuperar evaluación.
-             */
-            await restoreEvaluation();
-
-        } catch (error) {
-
-            console.error(
-                'Error inicializando examen:',
-                error
-            );
-
-        } finally {
-
-            loading.value = false;
-        }
     }
-);
+
+});
 
 
 onUnmounted(() => {
@@ -979,47 +1095,91 @@ onUnmounted(() => {
         'keydown',
         handleEscape
     );
+
+    if (hoverCloseTimer) {
+
+        clearTimeout(hoverCloseTimer);
+
+    }
+
 });
+
 </script>
 
 
 <template>
 
-    <div class="min-h-screen bg-[#f4f4f3] text-[#575756]">
+    <div
+        class="min-h-screen bg-[#f4f4f3] text-[#575756]"
+    >
 
         <!-- =====================================================
-         HEADER
-    ====================================================== -->
+             HEADER
+        ====================================================== -->
 
-        <header class="sticky top-0 z-20 border-b border-[#dadada] bg-white/95 backdrop-blur">
+        <header
+            class="sticky top-0 z-20 border-b border-[#dadada]
+                   bg-white/95 backdrop-blur"
+        >
 
-            <div class="mx-auto flex max-w-6xl items-center gap-4 px-5 py-4">
+            <div
+                class="mx-auto flex max-w-6xl items-center
+                       gap-4 px-5 py-4"
+            >
 
                 <div class="flex items-center gap-4">
 
-                    <img src="/logo_fgjtam.png" alt="Logo FGJ Tamaulipas"
-                        class="h-14 w-auto object-contain opacity-95" />
+                    <img
+                        src="/logo_fgjtam.png"
+                        alt="Logo FGJ Tamaulipas"
+                        class="h-14 w-auto object-contain opacity-95"
+                    />
 
                 </div>
 
-                <div class="ml-auto flex items-center gap-4">
 
-                    <div class="hidden text-right sm:block">
+                <div
+                    class="ml-auto flex items-center gap-4"
+                >
 
-                        <p class="text-sm font-bold leading-tight">
+                    <div
+                        class="hidden text-right sm:block"
+                    >
+
+                        <p
+                            class="text-sm font-bold leading-tight"
+                        >
                             {{ fullName }}
                         </p>
 
-                        <p class="text-xs leading-tight text-[#878787]">
+                        <p
+                            class="text-xs leading-tight
+                                   text-[#878787]"
+                        >
                             {{ user?.sector?.name }}
                         </p>
 
                     </div>
 
-                    <img src="/logo_fede.png" alt="Logo FEDE" class="h-15 w-auto object-contain opacity-95" />
 
-                    <button @click="logout()" title="Cerrar sesión"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dadada] text-[#878787] transition hover:border-[#575756] hover:text-[#575756]">
+                    <img
+                        src="/logo_fede.png"
+                        alt="Logo FEDE"
+                        class="h-15 w-auto object-contain opacity-95"
+                    />
+
+
+                    <button
+                        @click="logout()"
+                        title="Cerrar sesión"
+                        class="inline-flex h-9 w-9
+                               items-center justify-center
+                               rounded-lg border border-[#dadada]
+                               text-[#878787]
+                               transition
+                               hover:border-[#575756]
+                               hover:text-[#575756]"
+                    >
 
                         <LogOut :size="16" />
 
@@ -1033,21 +1193,341 @@ onUnmounted(() => {
 
 
         <!-- =====================================================
-         MAIN
-    ====================================================== -->
+             PDF SIDEBAR DERECHO
+        ====================================================== -->
 
-        <main class="mx-auto max-w-6xl px-5 py-8 md:py-6">
+        <Transition name="docs-fab">
+
+            <div
+                v-if="showDocsMenu"
+                ref="docsMenuRef"
+                class="fixed right-0 top-1/2 z-40
+                       -translate-y-1/2"
+            >
+
+                <div
+                    class="relative flex items-stretch"
+                    @mouseenter="openDocsMenu"
+                    @mouseleave="closeDocsMenu"
+                >
+
+                    <!-- =================================================
+                         PESTAÑA
+                    ================================================== -->
+
+                    <button
+                        type="button"
+                        @click.stop="toggleDocsMenu"
+                        title="Documentos de apoyo"
+                        class="relative z-20 flex h-32 w-11
+                               cursor-pointer items-center
+                               justify-center
+                               rounded-l-2xl
+                               border border-r-0
+                               border-[#dadada]
+                               bg-white
+                               text-[#575756]
+                               shadow-[0_8px_30px_rgba(0,0,0,0.08)]
+                               transition-all duration-300
+                               hover:bg-[#575756]
+                               hover:text-white
+                               hover:shadow-[0_8px_30px_rgba(0,0,0,0.18)]
+                               focus:outline-none
+                               focus:ring-2
+                               focus:ring-[#878787]/40"
+                    >
+
+                        <div
+                            class="flex flex-col
+                                   items-center gap-1.5"
+                        >
+
+                            <FileText :size="18" />
+
+                            <span
+                                class="text-[9px]
+                                       font-bold
+                                       uppercase
+                                       tracking-[0.15em]"
+                                style="
+                                    writing-mode: vertical-rl;
+                                "
+                            >
+                                PDFs
+                            </span>
+
+                        </div>
+
+                    </button>
+
+
+                    <!-- =================================================
+                         PANEL
+                    ================================================== -->
+
+                    <Transition name="docs-panel">
+
+                        <div
+                            v-if="docsMenuOpen"
+                            class="absolute right-11 top-1/2
+                                   -translate-y-1/2"
+                        >
+
+                            <aside
+                                class="w-[360px]
+                                       overflow-hidden
+                                       rounded-l-2xl
+                                       border border-r-0
+                                       border-[#dadada]
+                                       bg-white
+                                       shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)]"
+                            >
+
+                                <!-- HEADER -->
+
+                                <div
+                                    class="flex items-center
+                                           justify-between
+                                           border-b
+                                           border-[#dadada]
+                                           bg-gradient-to-br
+                                           from-[#575756]
+                                           to-[#3f3f3e]
+                                           px-4 py-3.5
+                                           text-white"
+                                >
+
+                                    <div
+                                        class="flex items-center gap-2.5"
+                                    >
+
+                                        <div
+                                            class="flex h-9 w-9
+                                                   items-center
+                                                   justify-center
+                                                   rounded-xl
+                                                   bg-white/10
+                                                   ring-1
+                                                   ring-white/15"
+                                        >
+
+                                            <FileText
+                                                :size="17"
+                                            />
+
+                                        </div>
+
+
+                                        <div>
+
+                                            <p
+                                                class="text-sm
+                                                       font-black
+                                                       leading-tight"
+                                            >
+                                                Documentos de apoyo
+                                            </p>
+
+                                            <p
+                                                class="text-[10px]
+                                                       text-white/60
+                                                       leading-tight
+                                                       mt-0.5"
+                                            >
+                                                Material de consulta
+                                            </p>
+
+                                        </div>
+
+                                    </div>
+
+
+                                    <span
+                                        class="rounded-full
+                                               bg-white/10
+                                               px-2.5 py-1
+                                               text-[10px]
+                                               font-bold
+                                               ring-1
+                                               ring-white/15"
+                                    >
+                                        {{ supportDocuments.length }}
+                                    </span>
+
+                                </div>
+
+
+                                <!-- DOCUMENTOS -->
+
+                                <div
+                                    class="max-h-[70vh]
+                                           space-y-1
+                                           overflow-y-auto
+                                           p-2
+                                           [scrollbar-width:thin]
+                                           [scrollbar-color:#dadada_transparent]"
+                                >
+
+                                    <button
+                                        v-for="doc in supportDocuments"
+                                        :key="doc.id"
+                                        type="button"
+                                        @click="openDocument(doc)"
+                                        class="group/doc flex w-full
+                                               items-center gap-3
+                                               rounded-xl p-2
+                                               text-left
+                                               transition-all
+                                               duration-200
+                                               hover:bg-[#f4f4f3]
+                                               hover:shadow-sm
+                                               focus:outline-none
+                                               focus:ring-2
+                                               focus:ring-[#878787]/30"
+                                    >
+
+                                        <!-- MINIATURA -->
+
+                                        <span
+                                            class="flex h-[68px]
+                                                   w-12 shrink-0
+                                                   items-center
+                                                   justify-center
+                                                   overflow-hidden
+                                                   rounded-lg
+                                                   border
+                                                   border-[#dadada]
+                                                   bg-[#f4f4f3]
+                                                   shadow-sm
+                                                   transition-all
+                                                   duration-200
+                                                   group-hover/doc:border-[#878787]
+                                                   group-hover/doc:shadow-md"
+                                        >
+
+                                            <img
+                                                v-if="
+                                                    thumbnails[doc.id]
+                                                "
+                                                :src="
+                                                    thumbnails[doc.id]
+                                                "
+                                                :alt="
+                                                    `Portada de ${doc.title}`
+                                                "
+                                                class="h-full
+                                                       w-full
+                                                       object-cover"
+                                            />
+
+                                            <FileText
+                                                v-else
+                                                :size="18"
+                                                class="text-[#878787]"
+                                            />
+
+                                        </span>
+
+
+                                        <!-- INFORMACIÓN -->
+
+                                        <span
+                                            class="min-w-0 flex-1"
+                                        >
+
+                                            <span
+                                                class="block
+                                                       text-xs
+                                                       font-bold
+                                                       leading-5
+                                                       text-[#575756]
+                                                       line-clamp-2"
+                                            >
+                                                {{ doc.title }}
+                                            </span>
+
+
+                                            <span
+                                                class="mt-1 flex
+                                                       items-center
+                                                       gap-1
+                                                       text-[10px]
+                                                       font-semibold
+                                                       text-[#878787]"
+                                            >
+
+                                                <FileText
+                                                    :size="11"
+                                                />
+
+                                                Consultar documento
+
+                                            </span>
+
+                                        </span>
+
+
+                                        <!-- FLECHA -->
+
+                                        <ChevronRight
+                                            :size="15"
+                                            class="shrink-0
+                                                   text-[#b0b0b0]
+                                                   transition-all
+                                                   duration-200
+                                                   group-hover/doc:translate-x-0.5
+                                                   group-hover/doc:text-[#575756]"
+                                        />
+
+                                    </button>
+
+                                </div>
+
+                            </aside>
+
+                        </div>
+
+                    </Transition>
+
+                </div>
+
+            </div>
+
+        </Transition>
+
+
+        <!-- =====================================================
+             MAIN
+        ====================================================== -->
+
+        <main
+            class="mx-auto max-w-6xl
+                   px-5 py-8 md:py-6"
+        >
 
             <!-- ===================================================
-           INTRO
-      ==================================================== -->
+                 INTRO
+            ==================================================== -->
 
-            <section v-if="stage === 'intro'" class="flex flex-col items-center">
+            <section
+                v-if="stage === 'intro'"
+                class="flex flex-col items-center"
+            >
 
-                <div class="mx-auto max-w-4xl text-center">
+                <div
+                    class="mx-auto max-w-4xl text-center"
+                >
 
                     <span
-                        class="inline-flex items-center gap-2 rounded-full bg-[#dadada]/60 px-3 py-1 text-xs font-semibold uppercase tracking-wider">
+                        class="inline-flex items-center gap-2
+                               rounded-full
+                               bg-[#dadada]/60
+                               px-3 py-1
+                               text-xs
+                               font-semibold
+                               uppercase
+                               tracking-wider"
+                    >
 
                         <PlayCircle :size="14" />
 
@@ -1056,7 +1536,13 @@ onUnmounted(() => {
                     </span>
 
 
-                    <h2 class="mt-5 text-4xl font-black tracking-tight md:text-5xl lg:text-4xl">
+                    <h2
+                        class="mt-5 text-4xl
+                               font-black
+                               tracking-tight
+                               md:text-5xl
+                               lg:text-4xl"
+                    >
 
                         Delitos Electorales y su investigación
                         en el contexto de los Procesos Electorales
@@ -1065,7 +1551,13 @@ onUnmounted(() => {
                     </h2>
 
 
-                    <p class="mx-auto mt-5 max-w-3xl text-base leading-7 text-[#878787] md:text-lg">
+                    <p
+                        class="mx-auto mt-5 max-w-3xl
+                               text-base
+                               leading-7
+                               text-[#878787]
+                               md:text-lg"
+                    >
 
                         Visualiza el material completo antes de
                         acceder a la evaluación del
@@ -1073,28 +1565,34 @@ onUnmounted(() => {
                         <br />
 
                         <b>
-                            Módulo 1: Nociones básicas de derecho
-                            electoral.
+                            Módulo 1: Nociones básicas de derecho electoral.
                         </b>
 
                     </p>
 
 
-                    <div class="mt-7 flex items-center justify-center gap-3 text-sm text-[#878787]">
+                    <div
+                        class="mt-7 flex items-center
+                               justify-center gap-3
+                               text-sm text-[#878787]"
+                    >
 
                         <LockKeyhole :size="17" />
 
                         <span v-if="!videoDone">
 
-                            La evaluación se habilita al concluir
-                            el video.
+                            La evaluación se habilita al
+                            concluir el video.
 
                         </span>
 
-                        <span v-else class="font-bold text-[#575756]">
+                        <span
+                            v-else
+                            class="font-bold text-[#575756]"
+                        >
 
-                            Video completado. Ya puedes continuar
-                            con la evaluación.
+                            Video completado.
+                            Ya puedes continuar con la evaluación.
 
                         </span>
 
@@ -1103,21 +1601,48 @@ onUnmounted(() => {
                 </div>
 
 
-                <!-- VIDEO -->
+                <!-- =================================================
+                     VIDEO
+                ================================================== -->
 
-                <div class="mt-8 w-full max-w-6xl">
+                <div
+                    class="mt-8 w-full max-w-6xl"
+                >
 
                     <div
-                        class="mx-auto max-w-5xl rounded-[32px] border border-[#dadada] bg-white p-3 shadow-xl shadow-black/5 md:p-4">
+                        class="relative mx-auto
+                               max-w-5xl
+                               rounded-[32px]
+                               border border-[#dadada]
+                               bg-white
+                               p-3
+                               shadow-xl
+                               shadow-black/5
+                               md:p-4"
+                    >
 
-                        <div class="overflow-hidden rounded-[26px] bg-[#575756]">
+                        <div
+                            class="overflow-hidden
+                                   rounded-[26px]
+                                   bg-[#575756]"
+                        >
 
-                            <video class="block aspect-video w-full object-cover" controls playsinline
-                                preload="metadata" @ended="videoEnded">
+                            <video
+                                class="block aspect-video
+                                       w-full object-cover"
+                                controls
+                                playsinline
+                                preload="metadata"
+                                @ended="videoEnded"
+                            >
 
-                                <source src="/curso-modulo1.mp4" type="video/mp4" />
+                                <source
+                                    src="/curso-modulo1.mp4"
+                                    type="video/mp4"
+                                />
 
-                                Tu navegador no soporta video HTML5.
+                                Tu navegador no soporta
+                                video HTML5.
 
                             </video>
 
@@ -1125,115 +1650,64 @@ onUnmounted(() => {
 
 
                         <div
-                            class="flex flex-col items-center justify-between gap-4 px-2 py-4 text-center sm:flex-row sm:text-left">
+                            class="flex flex-col
+                                   items-center
+                                   justify-between
+                                   gap-4 px-2 py-4
+                                   text-center
+                                   sm:flex-row
+                                   sm:text-left"
+                        >
 
                             <div>
 
-                                <p class="text-sm font-bold">
+                                <p
+                                    class="text-sm font-bold"
+                                >
                                     Material de capacitación
                                 </p>
 
-                                <p class="text-xs text-[#878787]">
+                                <p
+                                    class="text-xs
+                                           text-[#878787]"
+                                >
                                     Reproducción completa requerida
                                 </p>
 
                             </div>
 
 
-                            <button @click="startExam" :disabled="!videoDone ||
-                                loading
-                                "
-                                class="rounded-xl bg-[#575756] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#454544] disabled:cursor-not-allowed disabled:opacity-40">
+                            <div>
 
-                                {{
-                                    loading
-                                        ? 'Preparando evaluación…'
-                                        : 'Contestar evaluación'
-                                }}
+                                <button
+                                    @click="startExam"
+                                    :disabled="
+                                        !videoDone ||
+                                        loading
+                                    "
+                                    class="rounded-xl
+                                           bg-[#575756]
+                                           px-5 py-3
+                                           text-sm
+                                           font-bold
+                                           text-white
+                                           transition
+                                           hover:bg-[#454544]
+                                           disabled:cursor-not-allowed
+                                           disabled:opacity-40"
+                                >
 
-                            </button>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- =============================================
-               SUPPORT DOCUMENTS DROPDOWN
-          ============================================== -->
-
-                    <div v-if="supportDocuments.length" ref="docsMenuRef" class="relative mx-auto mt-4 max-w-5xl">
-
-                        <button @click.stop="toggleDocsMenu"
-                            class="flex w-full items-center justify-between gap-4 rounded-2xl border border-[#dadada] bg-white px-5 py-4 text-left shadow-sm transition hover:border-[#878787]">
-
-                            <span class="flex items-center gap-3">
-
-                                <span
-                                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f0f0ef] text-[#575756]">
-
-                                    <FileText :size="18" />
-
-                                </span>
-
-                                <span>
-
-                                    <span class="block text-sm font-bold">
-                                        Documentos de apoyo
-                                    </span>
-
-                                    <span class="block text-xs text-[#878787]">
-                                        {{ supportDocuments.length }}
-                                        materiales complementarios del módulo
-                                    </span>
-
-                                </span>
-
-                            </span>
-
-                            <ChevronDown :size="18" class="shrink-0 text-[#878787] transition-transform duration-200"
-                                :class="docsMenuOpen
-                                    ? 'rotate-180'
-                                    : ''
-                                    " />
-
-                        </button>
-
-
-                        <Transition name="fade">
-
-                            <div v-if="docsMenuOpen"
-                                class="absolute left-0 right-0 z-30 mt-2 max-h-96 overflow-y-auto rounded-2xl border border-[#dadada] bg-white p-2 shadow-2xl shadow-black/10">
-
-                                <button v-for="doc in supportDocuments" :key="doc.id" @click="openDocument(doc)"
-                                    class="flex w-full items-center gap-4 rounded-xl p-2 text-left transition hover:bg-[#f4f4f3]">
-
-                                    <span
-                                        class="flex h-16 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#dadada] bg-[#f4f4f3]">
-
-                                        <img v-if="thumbnails[doc.id]" :src="thumbnails[doc.id]"
-                                            :alt="`Portada de ${doc.title}`" class="h-full w-full object-cover" />
-
-                                        <FileText v-else :size="18" class="text-[#878787]" />
-
-                                    </span>
-
-
-                                    <span class="min-w-0 flex-1">
-
-                                        <span class="block truncate text-sm font-bold">
-                                            {{ doc.title }}
-                                        </span>
-                                    </span>
-
-
-                                    <ChevronRight :size="16" class="shrink-0 text-[#878787]" />
+                                    {{
+                                        loading
+                                            ? 'Preparando evaluación…'
+                                            : 'Contestar evaluación'
+                                    }}
 
                                 </button>
 
                             </div>
 
-                        </Transition>
+                        </div>
 
                     </div>
 
@@ -1243,22 +1717,36 @@ onUnmounted(() => {
 
 
             <!-- ===================================================
-           EXAM
-      ==================================================== -->
+                 EXAM
+            ==================================================== -->
 
-            <section v-else-if="stage === 'exam'" class="mx-auto max-w-4xl">
+            <section
+                v-else-if="stage === 'exam'"
+                class="mx-auto max-w-4xl"
+            >
 
                 <!-- HEADER -->
 
-                <div class="mb-5 flex items-center justify-between">
+                <div
+                    class="mb-5 flex items-center
+                           justify-between"
+                >
 
                     <div>
 
-                        <p class="text-xs font-bold uppercase tracking-widest text-[#878787]">
+                        <p
+                            class="text-xs
+                                   font-bold
+                                   uppercase
+                                   tracking-widest
+                                   text-[#878787]"
+                        >
                             Módulo 1
                         </p>
 
-                        <h2 class="text-xl font-black">
+                        <h2
+                            class="text-xl font-black"
+                        >
                             Nociones básicas de derecho electoral
                         </h2>
 
@@ -1267,15 +1755,18 @@ onUnmounted(() => {
 
                     <div class="text-right">
 
-                        <p class="text-sm font-bold">
+                        <p
+                            class="text-sm font-bold"
+                        >
                             {{ current + 1 }}
                             /
                             {{ questions.length }}
                         </p>
 
-                        <p class="text-xs text-[#878787]">
-                            {{ answeredCount }}
-                            contestadas
+                        <p
+                            class="text-xs text-[#878787]"
+                        >
+                            {{ answeredCount }} contestadas
                         </p>
 
                     </div>
@@ -1285,40 +1776,74 @@ onUnmounted(() => {
 
                 <!-- PROGRESS -->
 
-                <div class="h-2 overflow-hidden rounded-full bg-[#dadada]">
+                <div
+                    class="h-2 overflow-hidden
+                           rounded-full
+                           bg-[#dadada]"
+                >
 
-                    <div class="h-full rounded-full bg-[#575756] transition-all duration-500" :style="{
-                        width: progress + '%'
-                    }" />
+                    <div
+                        class="h-full
+                               rounded-full
+                               bg-[#575756]
+                               transition-all
+                               duration-500"
+                        :style="{
+                            width: progress + '%'
+                        }"
+                    />
 
                 </div>
 
 
                 <!-- QUESTION CARD -->
 
-                <div v-if="q"
-                    class="mt-8 rounded-3xl border border-[#dadada] bg-white p-6 shadow-xl shadow-black/5 md:p-10">
+                <div
+                    v-if="q"
+                    class="mt-8 rounded-3xl
+                           border border-[#dadada]
+                           bg-white p-6
+                           shadow-xl
+                           shadow-black/5
+                           md:p-10"
+                >
 
-                    <Transition name="fade" mode="out-in">
+                    <Transition
+                        name="fade"
+                        mode="out-in"
+                    >
 
                         <div :key="q.id">
 
                             <!-- QUESTION -->
 
-                            <div class="flex items-start gap-4">
+                            <div
+                                class="flex items-start
+                                       gap-4"
+                            >
 
                                 <span
-                                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#575756] text-sm font-black text-white">
-
+                                    class="flex h-10 w-10
+                                           shrink-0
+                                           items-center
+                                           justify-center
+                                           rounded-xl
+                                           bg-[#575756]
+                                           text-sm
+                                           font-black
+                                           text-white"
+                                >
                                     {{ q.number }}
-
                                 </span>
 
 
-                                <h3 class="text-xl font-bold leading-8 md:text-2xl">
-
+                                <h3
+                                    class="text-xl
+                                           font-bold
+                                           leading-8
+                                           md:text-2xl"
+                                >
                                     {{ q.text }}
-
                                 </h3>
 
                             </div>
@@ -1326,37 +1851,67 @@ onUnmounted(() => {
 
                             <!-- OPTIONS -->
 
-                            <div class="mt-8 space-y-3">
+                            <div
+                                class="mt-8 space-y-3"
+                            >
 
-                                <button v-for="o in q.options" :key="o.id" @click="selectOption(o.id)"
-                                    class="group flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition"
-                                    :class="answers[q.id] === o.id
-                                        ? 'border-[#575756] bg-[#f0f0ef] shadow-sm'
-                                        : 'border-[#dadada] hover:border-[#878787] hover:bg-[#fafafa]'
-                                        ">
+                                <button
+                                    v-for="o in q.options"
+                                    :key="o.id"
+                                    @click="
+                                        selectOption(o.id)
+                                    "
+                                    class="group flex w-full
+                                           items-start gap-4
+                                           rounded-2xl
+                                           border p-4
+                                           text-left
+                                           transition"
+                                    :class="
+                                        answers[q.id] === o.id
+                                            ? 'border-[#575756] bg-[#f0f0ef] shadow-sm'
+                                            : 'border-[#dadada] hover:border-[#878787] hover:bg-[#fafafa]'
+                                    "
+                                >
 
                                     <span
-                                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm font-bold"
-                                        :class="answers[q.id] === o.id
-                                            ? 'border-[#575756] bg-[#575756] text-white'
-                                            : 'border-[#dadada] text-[#878787]'
-                                            ">
-
+                                        class="flex h-8 w-8
+                                               shrink-0
+                                               items-center
+                                               justify-center
+                                               rounded-lg
+                                               border
+                                               text-sm
+                                               font-bold"
+                                        :class="
+                                            answers[q.id] === o.id
+                                                ? 'border-[#575756] bg-[#575756] text-white'
+                                                : 'border-[#dadada] text-[#878787]'
+                                        "
+                                    >
                                         {{ o.letter.toUpperCase() }}
-
                                     </span>
 
 
-                                    <span class="pt-1 text-sm leading-6 md:text-base">
-
+                                    <span
+                                        class="pt-1
+                                               text-sm
+                                               leading-6
+                                               md:text-base"
+                                    >
                                         {{ o.text }}
-
                                     </span>
 
 
-                                    <CheckCircle2 v-if="
-                                        answers[q.id] === o.id
-                                    " class="ml-auto mt-1 shrink-0" :size="20" />
+                                    <CheckCircle2
+                                        v-if="
+                                            answers[q.id] === o.id
+                                        "
+                                        class="ml-auto
+                                               mt-1
+                                               shrink-0"
+                                        :size="20"
+                                    />
 
                                 </button>
 
@@ -1365,13 +1920,25 @@ onUnmounted(() => {
 
                             <!-- SAVE STATUS -->
 
-                            <div class="mt-4 text-right text-xs text-[#878787]">
+                            <div
+                                class="mt-4
+                                       text-right
+                                       text-xs
+                                       text-[#878787]"
+                            >
 
-                                <span v-if="savingAnswer">
+                                <span
+                                    v-if="savingAnswer"
+                                >
                                     Guardando respuesta…
                                 </span>
 
-                                <span v-else-if="answers[q.id]" class="font-semibold">
+                                <span
+                                    v-else-if="
+                                        answers[q.id]
+                                    "
+                                    class="font-semibold"
+                                >
                                     Respuesta guardada
                                 </span>
 
@@ -1384,12 +1951,30 @@ onUnmounted(() => {
 
                     <!-- NAVIGATION -->
 
-                    <div class="mt-9 flex items-center justify-between border-t border-[#dadada] pt-5">
+                    <div
+                        class="mt-9 flex
+                               items-center
+                               justify-between
+                               border-t
+                               border-[#dadada]
+                               pt-5"
+                    >
 
-                        <button @click="previous" :disabled="current === 0 ||
-                            savingAnswer
+                        <button
+                            @click="previous"
+                            :disabled="
+                                current === 0 ||
+                                savingAnswer
                             "
-                            class="inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-30">
+                            class="inline-flex
+                                   items-center
+                                   gap-2
+                                   rounded-xl
+                                   px-4 py-3
+                                   text-sm
+                                   font-bold
+                                   disabled:opacity-30"
+                        >
 
                             <ChevronLeft :size="18" />
 
@@ -1398,12 +1983,24 @@ onUnmounted(() => {
                         </button>
 
 
-                        <!-- NEXT -->
-
-                        <button v-if="!isLastQuestion" @click="next" :disabled="!canNext ||
-                            savingAnswer
+                        <button
+                            v-if="!isLastQuestion"
+                            @click="next"
+                            :disabled="
+                                !canNext ||
+                                savingAnswer
                             "
-                            class="inline-flex items-center gap-2 rounded-xl bg-[#575756] px-5 py-3 text-sm font-bold text-white disabled:opacity-30">
+                            class="inline-flex
+                                   items-center
+                                   gap-2
+                                   rounded-xl
+                                   bg-[#575756]
+                                   px-5 py-3
+                                   text-sm
+                                   font-bold
+                                   text-white
+                                   disabled:opacity-30"
+                        >
 
                             Siguiente
 
@@ -1412,13 +2009,25 @@ onUnmounted(() => {
                         </button>
 
 
-                        <!-- FINISH -->
-
-                        <button v-else @click="finish" :disabled="!allAnswered ||
-                            loading ||
-                            savingAnswer
+                        <button
+                            v-else
+                            @click="finish"
+                            :disabled="
+                                !allAnswered ||
+                                loading ||
+                                savingAnswer
                             "
-                            class="inline-flex items-center gap-2 rounded-xl bg-[#575756] px-5 py-3 text-sm font-bold text-white disabled:opacity-30">
+                            class="inline-flex
+                                   items-center
+                                   gap-2
+                                   rounded-xl
+                                   bg-[#575756]
+                                   px-5 py-3
+                                   text-sm
+                                   font-bold
+                                   text-white
+                                   disabled:opacity-30"
+                        >
 
                             {{
                                 loading
@@ -1437,15 +2046,30 @@ onUnmounted(() => {
 
                 <!-- QUESTION NAVIGATION -->
 
-                <div v-if="questions.length" class="mt-5 flex flex-wrap gap-2">
+                <div
+                    v-if="questions.length"
+                    class="mt-5 flex
+                           flex-wrap gap-2"
+                >
 
-                    <button v-for="(item, i) in questions" :key="item.id" @click="goToQuestion(i)"
-                        class="h-8 w-8 rounded-lg text-xs font-bold" :class="i === current
-                            ? 'bg-[#575756] text-white'
-                            : answers[item.id]
-                                ? 'bg-[#dadada] text-[#575756]'
-                                : 'border border-[#dadada] bg-white text-[#878787]'
-                            ">
+                    <button
+                        v-for="(item, i) in questions"
+                        :key="item.id"
+                        @click="
+                            goToQuestion(i)
+                        "
+                        class="h-8 w-8
+                               rounded-lg
+                               text-xs
+                               font-bold"
+                        :class="
+                            i === current
+                                ? 'bg-[#575756] text-white'
+                                : answers[item.id]
+                                    ? 'bg-[#dadada] text-[#575756]'
+                                    : 'border border-[#dadada] bg-white text-[#878787]'
+                        "
+                    >
 
                         {{ i + 1 }}
 
@@ -1457,38 +2081,79 @@ onUnmounted(() => {
 
 
             <!-- ===================================================
-           RESULT
-      ==================================================== -->
+                 RESULT
+            ==================================================== -->
 
-            <section v-else class="mx-auto max-w-3xl">
+            <section
+                v-else
+                class="mx-auto max-w-3xl"
+            >
 
                 <div
-                    class="overflow-hidden rounded-[32px] border border-[#dadada] bg-white text-center shadow-xl shadow-black/5">
+                    class="overflow-hidden
+                           rounded-[32px]
+                           border border-[#dadada]
+                           bg-white
+                           text-center
+                           shadow-xl
+                           shadow-black/5"
+                >
 
-                    <div class="bg-[#575756] px-6 py-14 text-white">
+                    <div
+                        class="bg-[#575756]
+                               px-6 py-14
+                               text-white"
+                    >
 
-                        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10">
+                        <div
+                            class="mx-auto flex
+                                   h-16 w-16
+                                   items-center
+                                   justify-center
+                                   rounded-2xl
+                                   bg-white/10"
+                        >
 
-                            <ClipboardCheck :size="34" />
+                            <ClipboardCheck
+                                :size="34"
+                            />
 
                         </div>
 
 
-                        <p class="mt-5 text-xs font-bold uppercase tracking-[.25em] text-white/70">
+                        <p
+                            class="mt-5
+                                   text-xs
+                                   font-bold
+                                   uppercase
+                                   tracking-[.25em]
+                                   text-white/70"
+                        >
                             Finalización
                         </p>
 
 
-                        <h2 class="mt-2 text-3xl font-black md:text-4xl">
+                        <h2
+                            class="mt-2
+                                   text-3xl
+                                   font-black
+                                   md:text-4xl"
+                        >
                             ¡Evaluación finalizada!
                         </h2>
 
                     </div>
 
 
-                    <div class="p-8 md:p-10">
+                    <div
+                        class="p-8 md:p-10"
+                    >
 
-                        <p class="text-lg font-bold text-[#575756]">
+                        <p
+                            class="text-lg
+                                   font-bold
+                                   text-[#575756]"
+                        >
                             {{
                                 fullName ||
                                 'Participante registrado'
@@ -1496,43 +2161,84 @@ onUnmounted(() => {
                         </p>
 
 
-                        <!-- RESULT -->
+                        <div
+                            class="mx-auto mt-6
+                                   grid max-w-md
+                                   grid-cols-3 gap-3"
+                        >
 
-                        <div class="mx-auto mt-6 grid max-w-md grid-cols-3 gap-3">
+                            <div
+                                class="rounded-2xl
+                                       border
+                                       border-[#dadada]
+                                       p-4"
+                            >
 
-                            <div class="rounded-2xl border border-[#dadada] p-4">
-
-                                <p class="text-2xl font-black text-[#575756]">
+                                <p
+                                    class="text-2xl
+                                           font-black
+                                           text-[#575756]"
+                                >
                                     {{ result.score }}%
                                 </p>
 
-                                <p class="mt-1 text-xs text-[#878787]">
+                                <p
+                                    class="mt-1
+                                           text-xs
+                                           text-[#878787]"
+                                >
                                     Calificación
                                 </p>
 
                             </div>
 
 
-                            <div class="rounded-2xl border border-[#dadada] p-4">
+                            <div
+                                class="rounded-2xl
+                                       border
+                                       border-[#dadada]
+                                       p-4"
+                            >
 
-                                <p class="text-2xl font-black text-[#575756]">
+                                <p
+                                    class="text-2xl
+                                           font-black
+                                           text-[#575756]"
+                                >
                                     {{ result.correct }}
                                 </p>
 
-                                <p class="mt-1 text-xs text-[#878787]">
+                                <p
+                                    class="mt-1
+                                           text-xs
+                                           text-[#878787]"
+                                >
                                     Correctas
                                 </p>
 
                             </div>
 
 
-                            <div class="rounded-2xl border border-[#dadada] p-4">
+                            <div
+                                class="rounded-2xl
+                                       border
+                                       border-[#dadada]
+                                       p-4"
+                            >
 
-                                <p class="text-2xl font-black text-[#575756]">
+                                <p
+                                    class="text-2xl
+                                           font-black
+                                           text-[#575756]"
+                                >
                                     {{ result.total }}
                                 </p>
 
-                                <p class="mt-1 text-xs text-[#878787]">
+                                <p
+                                    class="mt-1
+                                           text-xs
+                                           text-[#878787]"
+                                >
                                     Preguntas
                                 </p>
 
@@ -1541,7 +2247,12 @@ onUnmounted(() => {
                         </div>
 
 
-                        <p class="mt-6 text-base leading-7 text-[#878787]">
+                        <p
+                            class="mt-6
+                                   text-base
+                                   leading-7
+                                   text-[#878787]"
+                        >
 
                             Gracias por completar el módulo de
                             capacitación. Tu participación ha sido
@@ -1551,8 +2262,19 @@ onUnmounted(() => {
                         </p>
 
 
-                        <button @click="restart"
-                            class="mt-8 inline-flex items-center gap-2 rounded-xl bg-[#575756] px-5 py-3 text-sm font-bold text-white hover:bg-[#454544]">
+                        <button
+                            @click="restart"
+                            class="mt-8 inline-flex
+                                   items-center
+                                   gap-2
+                                   rounded-xl
+                                   bg-[#575756]
+                                   px-5 py-3
+                                   text-sm
+                                   font-bold
+                                   text-white
+                                   hover:bg-[#454544]"
+                        >
 
                             <RotateCcw :size="17" />
 
@@ -1570,45 +2292,112 @@ onUnmounted(() => {
 
 
         <!-- =====================================================
-         FOOTER
-    ====================================================== -->
+             FOOTER
+        ====================================================== -->
 
-        <footer class="mx-auto max-w-6xl px-5 pb-8 text-center text-xs text-[#878787]">
+        <footer
+            class="mx-auto max-w-6xl
+                   px-5 pb-8
+                   text-center
+                   text-xs
+                   text-[#878787]"
+        >
 
-            Fiscalía General de Justicia del Estado de Tamaulipas
-            · Fiscalía Especializada en Delitos Electorales
+            Fiscalía General de Justicia
+            del Estado de Tamaulipas
+
+            ·
+
+            Fiscalía Especializada
+            en Delitos Electorales
 
         </footer>
 
 
         <!-- =====================================================
-         PDF VIEWER MODAL
-    ====================================================== -->
+             PDF VIEWER MODAL
+        ====================================================== -->
 
         <Transition name="fade">
 
-            <div v-if="viewingDoc" @click.self="closeViewer"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm md:p-8">
+            <div
+                v-if="viewingDoc"
+                @click.self="closeViewer"
+                class="fixed inset-0 z-50
+                       flex items-center
+                       justify-center
+                       bg-black/60
+                       p-4
+                       backdrop-blur-sm
+                       md:p-8"
+            >
 
-                <div class="flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div
+                    class="flex h-full
+                           w-full max-w-5xl
+                           flex-col
+                           overflow-hidden
+                           rounded-2xl
+                           bg-white
+                           shadow-2xl"
+                >
 
-                    <div class="flex items-center justify-between border-b border-[#dadada] px-5 py-3">
+                    <!-- HEADER PDF -->
 
-                        <div class="flex items-center gap-3 truncate">
+                    <div
+                        class="flex items-center
+                               justify-between
+                               border-b
+                               border-[#dadada]
+                               px-5 py-3"
+                    >
+
+                        <div
+                            class="flex min-w-0
+                                   items-center
+                                   gap-3"
+                        >
 
                             <span
-                                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#f0f0ef] text-[#575756]">
+                                class="flex h-8 w-8
+                                       shrink-0
+                                       items-center
+                                       justify-center
+                                       rounded-lg
+                                       bg-[#f0f0ef]
+                                       text-[#575756]"
+                            >
+
                                 <FileText :size="16" />
+
                             </span>
 
-                            <p class="truncate text-sm font-bold">
+
+                            <p
+                                class="truncate
+                                       text-sm
+                                       font-bold"
+                            >
                                 {{ viewingDoc.title }}
                             </p>
 
                         </div>
 
-                        <button @click="closeViewer" title="Cerrar"
-                            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#878787] transition hover:bg-[#f4f4f3] hover:text-[#575756]">
+
+                        <button
+                            @click="closeViewer"
+                            title="Cerrar"
+                            class="inline-flex
+                                   h-8 w-8
+                                   shrink-0
+                                   items-center
+                                   justify-center
+                                   rounded-lg
+                                   text-[#878787]
+                                   transition
+                                   hover:bg-[#f4f4f3]
+                                   hover:text-[#575756]"
+                        >
 
                             <X :size="18" />
 
@@ -1617,7 +2406,16 @@ onUnmounted(() => {
                     </div>
 
 
-                    <iframe :src="viewingDoc.url" :title="viewingDoc.title" class="h-full w-full flex-1 bg-[#f4f4f3]" />
+                    <!-- PDF -->
+
+                    <iframe
+                        :src="viewingDoc.url"
+                        :title="viewingDoc.title"
+                        class="h-full
+                               w-full
+                               flex-1
+                               bg-[#f4f4f3]"
+                    />
 
                 </div>
 
@@ -1631,13 +2429,121 @@ onUnmounted(() => {
 
 
 <style scoped>
+
+/* =========================================================
+   FADE GENERAL
+   ========================================================= */
+
 .fade-enter-active,
 .fade-leave-active {
-    transition: opacity 0.15s ease;
+
+    transition:
+        opacity 0.15s ease;
+
 }
 
 .fade-enter-from,
 .fade-leave-to {
+
     opacity: 0;
+
 }
+
+
+/* =========================================================
+   PDF SIDEBAR - PESTAÑA
+   ========================================================= */
+
+.docs-fab-enter-active,
+.docs-fab-leave-active {
+
+    transition:
+        opacity 0.3s ease,
+        transform 0.3s ease;
+
+}
+
+.docs-fab-enter-from,
+.docs-fab-leave-to {
+
+    opacity: 0;
+
+    transform:
+        translateX(40px)
+        translateY(-50%);
+
+}
+
+
+/* =========================================================
+   PDF SIDEBAR - PANEL
+   ========================================================= */
+
+.docs-panel-enter-active {
+
+    transition:
+        opacity 0.25s
+            cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.25s
+            cubic-bezier(0.16, 1, 0.3, 1);
+
+}
+
+.docs-panel-leave-active {
+
+    transition:
+        opacity 0.15s ease,
+        transform 0.15s ease;
+
+}
+
+.docs-panel-enter-from,
+.docs-panel-leave-to {
+
+    opacity: 0;
+
+    transform: translateX(20px);
+
+}
+
+.docs-panel-enter-to,
+.docs-panel-leave-from {
+
+    opacity: 1;
+
+    transform: translateX(0);
+
+}
+
+
+/* =========================================================
+   SCROLLBAR DEL SIDEBAR
+   ========================================================= */
+
+::-webkit-scrollbar {
+
+    width: 6px;
+
+}
+
+::-webkit-scrollbar-track {
+
+    background: transparent;
+
+}
+
+::-webkit-scrollbar-thumb {
+
+    background: #dadada;
+
+    border-radius: 999px;
+
+}
+
+::-webkit-scrollbar-thumb:hover {
+
+    background: #878787;
+
+}
+
 </style>
