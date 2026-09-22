@@ -44,6 +44,27 @@ function clear() {
   localStorage.removeItem(USER_KEY);
 }
 
+// Convierte el "detail" de una respuesta de error en un mensaje legible.
+// Soporta: string normal, array crudo de errores de Pydantic (por si algún
+// endpoint no pasa por el exception handler en español), u otros formatos.
+function extractErrorMessage(data: any, fallback: string): string {
+  const detail = data?.detail;
+
+  if (!detail) return fallback;
+
+  if (typeof detail === 'string') {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const first = detail[0];
+    if (typeof first === 'string') return first;
+    if (first?.msg) return first.msg;
+  }
+
+  return fallback;
+}
+
 async function apiFetch(path: string, options: RequestInit = {}) {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -70,10 +91,10 @@ async function login(email: string, password: string) {
     body: JSON.stringify({ email, password }),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(data.detail || 'No se pudo iniciar sesión.');
+    throw new Error(extractErrorMessage(data, 'No se pudo iniciar sesión.'));
   }
 
   persist(data.access_token, data.user);
@@ -95,10 +116,10 @@ async function register(payload: {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(data.detail || 'No se pudo completar el registro.');
+    throw new Error(extractErrorMessage(data, 'No se pudo completar el registro.'));
   }
 
   persist(data.access_token, data.user);

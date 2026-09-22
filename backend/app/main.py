@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from pydantic import BaseModel, Field, EmailStr
 
@@ -434,6 +436,45 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+
+ERROR_MESSAGES_ES = {
+    "missing": "Este campo es obligatorio.",
+    "string_too_short": "El valor es demasiado corto.",
+    "string_too_long": "El valor es demasiado largo.",
+    "value_error": "El valor ingresado no es válido.",
+}
+
+
+def translate_error(err: dict) -> str:
+    field = err["loc"][-1] if err.get("loc") else ""
+    error_type = err.get("type", "")
+
+    if field == "email" and ("email" in error_type or "value_error" in error_type):
+        return "El correo electrónico no es válido. Debe incluir un @, por ejemplo: nombre@dominio.com"
+
+    if field == "password":
+        if error_type == "string_too_short":
+            return "La contraseña debe tener al menos 8 caracteres."
+        if error_type == "string_too_long":
+            return "La contraseña es demasiado larga."
+
+    if field == "curp":
+        return "La CURP debe tener exactamente 18 caracteres."
+
+    return ERROR_MESSAGES_ES.get(error_type, "Uno de los campos no es válido.")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    errors = exc.errors()
+    message = translate_error(errors[0]) if errors else "Datos inválidos."
+
+    return JSONResponse(
+        status_code=422,
+        content={"detail": message},
+    )
 
 
 # ============================================================
