@@ -1525,75 +1525,17 @@ onUnmounted(() => {
                      VIDEO
                 ================================================== -->
 
-                <div class="mt-8 w-full max-w-6xl">
+                <div class="mt-8 flex w-full justify-center">
 
-                    <div class="relative mx-auto
-                               max-w-5xl
-                               rounded-[32px]
-                               border border-[#dadada]
-                               bg-white
-                               p-3
-                               shadow-xl
-                               shadow-black/5
-                               md:p-4">
-
-                        <button
-                            type="button"
-                            class="group relative block w-full overflow-hidden rounded-[26px] bg-[#575756] text-left focus:outline-none focus:ring-2 focus:ring-[#575756] focus:ring-offset-2"
-                            aria-label="Abrir video de capacitación"
-                            @click="openVideoModal"
-                        >
-                            <video
-                                class="block aspect-video w-full object-cover"
-                                muted
-                                playsinline
-                                preload="metadata"
-                            >
-                                <source src="/curso-modulo1.mp4" type="video/mp4" />
-                                Tu navegador no soporta video HTML5.
-                            </video>
-
-                            <span class="absolute inset-0 flex items-center justify-center bg-black/20 transition group-hover:bg-black/35">
-                                <span class="flex h-16 w-16 items-center justify-center rounded-full bg-white/95 text-[#575756] shadow-xl transition group-hover:scale-105">
-                                    <PlayCircle :size="34" />
-                                </span>
-                            </span>
-
-                            <span class="absolute bottom-4 left-4 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white">
-                                Ver material introductorio
-                            </span>
-                        </button>
-
-
-                        <div class="flex flex-col
-                                   items-center
-                                   justify-between
-                                   gap-4 px-2 py-4
-                                   text-center
-                                   sm:flex-row
-                                   sm:text-left">
-
-                            <div>
-
-                                <p class="text-sm font-bold">
-                                    Material de capacitación
-                                </p>
-
-                                <p class="text-xs
-                                           text-[#878787]">
-                                    Reproducción completa requerida
-                                </p>
-
-                            </div>
-
-
-                            <span class="text-xs font-semibold text-[#878787]">
-                                Abre el video para reproducirlo.
-                            </span>
-
-                        </div>
-
-                    </div>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-3 rounded-2xl bg-[#575756] px-8 py-4 text-base font-black text-white shadow-xl shadow-black/10 transition hover:-translate-y-0.5 hover:bg-[#454544] hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-[#575756] focus:ring-offset-4"
+                        aria-label="Ver video de capacitación"
+                        @click="openVideoModal"
+                    >
+                        <PlayCircle :size="23" />
+                        Ver video
+                    </button>
 
                 </div>
 
@@ -1602,38 +1544,64 @@ onUnmounted(() => {
 
                 <div
                     v-if="videoModalOpen"
-                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm md:p-8"
+                    class="fixed inset-0 z-[9999] flex min-h-screen flex-col overflow-y-auto bg-[#20201f] text-white"
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="video-modal-title"
                     @click.self="closeVideoModal"
                 >
-                    <div class="relative w-full max-w-5xl rounded-3xl bg-white p-4 shadow-2xl md:p-6">
-                        <div class="mb-4 flex items-center justify-between gap-4">
-                            <div>
-                                <p id="video-modal-title" class="text-lg font-black text-[#575756]">
-                                    Material de capacitación
-                                </p>
-                                <p class="text-sm text-[#878787]">
-                                    Reproduce el video completo para habilitar la evaluación.
-                                </p>
-                            </div>
+                    <div class="flex min-h-screen w-full flex-col">
+                        <header class="border-b border-white/10 bg-[#292928] px-5 py-4 md:px-10">
+                            <div class="mx-auto flex max-w-7xl items-center gap-4">
+                                <img
+                                    src="/logo_fgjtam.png"
+                                    alt="Logo Fiscalía General de Justicia de Tamaulipas"
+                                    class="h-12 w-auto object-contain md:h-16"
+                                />
+
+                                <div class="h-10 w-px bg-white/20 md:h-12" />
+
+                                <img
+                                    src="/logo_fede.png"
+                                    alt="Logo Fiscalía Especializada en Delitos Electorales"
+                                    class="h-12 w-auto object-contain md:h-16"
+                                />
+
+                                <div class="ml-auto min-w-0 pr-10">
+                                    <p class="truncate text-xs font-bold uppercase tracking-[0.18em] text-white/55">
+                                        Material introductorio
+                                    </p>
+                                    <h2 id="video-modal-title" class="mt-1 text-sm font-black text-white md:text-lg">
+                                        Delitos Electorales y su investigación
+                                    </h2>
+                                </div>
 
                             <button
                                 type="button"
                                 title="Cerrar video"
                                 aria-label="Cerrar video"
-                                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#878787] transition hover:bg-[#f4f4f3] hover:text-[#575756]"
+                                class="absolute right-5 top-5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/65 transition hover:bg-white/10 hover:text-white md:right-10"
                                 @click="closeVideoModal"
                             >
                                 <X :size="20" />
                             </button>
-                        </div>
+                            </div>
+                        </header>
 
-                        <div class="mx-auto overflow-hidden rounded-2xl bg-black">
+                        <main class="flex flex-1 flex-col items-center justify-center px-4 py-8 md:px-10 md:py-12">
+                            <div class="mb-6 text-center md:mb-8">
+                                <p class="text-2xl font-black md:text-4xl">
+                                    Módulo 1: Nociones básicas de derecho electoral
+                                </p>
+                                <p class="mt-2 text-sm text-white/60 md:text-base">
+                                    Reproduce el video completo antes de contestar la evaluación.
+                                </p>
+                            </div>
+
+                            <div class="w-full max-w-6xl overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl md:rounded-3xl">
                             <video
                                 ref="modalVideoRef"
-                                class="mx-auto block max-h-[65vh] w-full object-contain"
+                                class="mx-auto block max-h-[68vh] w-full object-contain"
                                 controls
                                 autoplay
                                 playsinline
@@ -1643,23 +1611,24 @@ onUnmounted(() => {
                                 <source src="/curso-modulo1.mp4" type="video/mp4" />
                                 Tu navegador no soporta video HTML5.
                             </video>
-                        </div>
+                            </div>
 
-                        <div class="mt-5 flex flex-col items-center justify-between gap-4 border-t border-[#dadada] pt-5 sm:flex-row">
-                            <p class="text-sm text-[#878787]">
-                                <span v-if="!videoDone">La evaluación se habilita al terminar el video.</span>
-                                <span v-else class="font-bold text-[#575756]">Video completado. Ya puedes continuar.</span>
-                            </p>
+                            <div class="mt-6 flex w-full max-w-6xl flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 sm:flex-row">
+                                <p class="text-sm text-white/60">
+                                    <span v-if="!videoDone">La evaluación se habilita al terminar el video.</span>
+                                    <span v-else class="font-bold text-emerald-300">Video completado. Ya puedes continuar.</span>
+                                </p>
 
-                            <button
-                                type="button"
-                                :disabled="!videoDone || loading"
-                                class="rounded-xl bg-[#575756] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#454544] disabled:cursor-not-allowed disabled:opacity-40"
-                                @click="startExam"
-                            >
-                                {{ loading ? 'Preparando evaluación…' : 'Contestar evaluación' }}
-                            </button>
-                        </div>
+                                <button
+                                    type="button"
+                                    :disabled="!videoDone || loading"
+                                    class="rounded-xl bg-white px-6 py-3 text-sm font-black text-[#292928] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+                                    @click="startExam"
+                                >
+                                    {{ loading ? 'Preparando evaluación…' : 'Contestar evaluación' }}
+                                </button>
+                            </div>
+                        </main>
                     </div>
                 </div>
 
