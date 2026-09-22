@@ -10,6 +10,9 @@ const authView = ref<'login' | 'register'>('login');
 </script>
 
 <template>
+  <head>
+    <title>Evaluación de Capacitación - Fiscalía Especializada en Delitos Electorales</title>
+  </head>  
   <ExamFlow v-if="isAuthenticated" />
   <Login v-else-if="authView === 'login'" @go-register="authView = 'register'" />
   <Register v-else @go-login="authView = 'login'" @success="authView = 'login'" />
