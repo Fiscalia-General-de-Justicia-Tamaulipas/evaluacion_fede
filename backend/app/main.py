@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import os
 import time
 from pathlib import Path
@@ -6,10 +6,14 @@ from urllib.parse import urlparse, urlunparse
 
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
+
+from passlib.context import CryptContext
+from jose import JWTError, jwt
 
 from sqlalchemy import (
     create_engine,
@@ -19,6 +23,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     Text,
+    UniqueConstraint,
     select,
     text,
 )
@@ -54,6 +59,12 @@ if not DATABASE_URL:
         "La variable DATABASE_URL no está configurada en el archivo .env."
     )
 
+# Clave para firmar los tokens JWT. En producción DEBE definirse en el .env
+# con un valor largo y aleatorio (por ejemplo: openssl rand -hex 32).
+SECRET_KEY = os.getenv("SECRET_KEY", "cambia-esta-clave-en-produccion")
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
+
 
 # ============================================================
 # BASE SQLALCHEMY
@@ -67,25 +78,51 @@ class Base(DeclarativeBase):
 # MODELOS
 # ============================================================
 
+class Institution(Base):
+    __tablename__ = "institutions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+
+    users: Mapped[list["User"]] = relationship(back_populates="institution")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    first_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    paternal_surname: Mapped[str] = mapped_column(String(120), nullable=False)
+    maternal_surname: Mapped[str] = mapped_column(String(120), nullable=False)
+
+    email: Mapped[str] = mapped_column(String(190), unique=True, nullable=False, index=True)
+    curp: Mapped[str] = mapped_column(String(18), unique=True, nullable=False, index=True)
+
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    institution_id: Mapped[int] = mapped_column(ForeignKey("institutions.id"), nullable=False)
+    institution: Mapped[Institution] = relationship(back_populates="users")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    evaluations: Mapped[list["Evaluation"]] = relationship(back_populates="user")
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.paternal_surname} {self.maternal_surname}".strip()
+
+
 class Question(Base):
     __tablename__ = "questions"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    number: Mapped[int] = mapped_column(
-        Integer,
-        unique=True,
-        nullable=False,
-    )
-
-    text: Mapped[str] = mapped_column(
-        Text,
-        nullable=False,
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    number: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
 
     options: Mapped[list["Option"]] = relationship(
         back_populates="question",
@@ -97,158 +134,54 @@ class Question(Base):
 class Option(Base):
     __tablename__ = "options"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    question_id: Mapped[int] = mapped_column(ForeignKey("questions.id"), nullable=False)
+    letter: Mapped[str] = mapped_column(String(2), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    question_id: Mapped[int] = mapped_column(
-        ForeignKey("questions.id"),
-        nullable=False,
-    )
-
-    letter: Mapped[str] = mapped_column(
-        String(2),
-        nullable=False,
-    )
-
-    text: Mapped[str] = mapped_column(
-        Text,
-        nullable=False,
-    )
-
-    is_correct: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=False,
-    )
-
-    position: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-    )
-
-    question: Mapped[Question] = relationship(
-        back_populates="options"
-    )
-
-
-class Participant(Base):
-    __tablename__ = "participants"
-
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    first_name: Mapped[str] = mapped_column(
-        String(120),
-        nullable=False,
-    )
-
-    paternal_surname: Mapped[str] = mapped_column(
-        String(120),
-        nullable=False,
-    )
-
-    maternal_surname: Mapped[str] = mapped_column(
-        String(120),
-        nullable=False,
-    )
+    question: Mapped[Question] = relationship(back_populates="options")
 
 
 class Evaluation(Base):
     __tablename__ = "evaluations"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    participant_id: Mapped[int] = mapped_column(
-        ForeignKey("participants.id"),
-        nullable=False,
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user: Mapped[User] = relationship(back_populates="evaluations")
 
-    video_completed: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=False,
-    )
+    video_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
-    score: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-    )
-
-    correct_answers: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-    )
-
-    total_questions: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-    )
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    correct_answers: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_questions: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class Answer(Base):
     __tablename__ = "answers"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    evaluation_id: Mapped[int] = mapped_column(
-        ForeignKey("evaluations.id"),
-        nullable=False,
-    )
-
-    question_id: Mapped[int] = mapped_column(
-        ForeignKey("questions.id"),
-        nullable=False,
-    )
-
-    option_id: Mapped[int] = mapped_column(
-        ForeignKey("options.id"),
-        nullable=False,
-    )
-
-    is_correct: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    evaluation_id: Mapped[int] = mapped_column(ForeignKey("evaluations.id"), nullable=False)
+    question_id: Mapped[int] = mapped_column(ForeignKey("questions.id"), nullable=False)
+    option_id: Mapped[int] = mapped_column(ForeignKey("options.id"), nullable=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
 
 # ============================================================
-# DATABASE URL
+# DATABASE URL (admin helper para crear la BD si no existe)
 # ============================================================
 
 def get_admin_database_url(database_url: str) -> str:
     parsed = urlparse(database_url)
-
     database_name = parsed.path.lstrip("/")
-
     if not database_name:
         return database_url
-
     admin_parsed = parsed._replace(path="")
-
     return urlunparse(admin_parsed)
 
 
@@ -256,17 +189,9 @@ def get_admin_database_url(database_url: str) -> str:
 # ENGINE
 # ============================================================
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
-
-SessionLocal = sessionmaker(
-    bind=engine,
-    autoflush=False,
-    autocommit=False,
-)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 # ============================================================
@@ -275,16 +200,11 @@ SessionLocal = sessionmaker(
 
 def ensure_database_exists() -> None:
     database_name = urlparse(DATABASE_URL).path.lstrip("/")
-
     if not database_name:
         return
 
     admin_url = get_admin_database_url(DATABASE_URL)
-
-    admin_engine = create_engine(
-        admin_url,
-        pool_pre_ping=True,
-    )
+    admin_engine = create_engine(admin_url, pool_pre_ping=True)
 
     try:
         with admin_engine.connect() as connection:
@@ -297,57 +217,59 @@ def ensure_database_exists() -> None:
                     """
                 )
             )
-
             connection.commit()
-
     finally:
         admin_engine.dispose()
 
 
-def wait_for_database(
-    max_attempts: int = 30,
-    delay_seconds: int = 2,
-) -> None:
-
+def wait_for_database(max_attempts: int = 30, delay_seconds: int = 2) -> None:
     last_error = None
 
     for attempt in range(max_attempts):
-
         try:
-
             with engine.connect() as connection:
                 connection.execute(text("SELECT 1"))
-
             print("✓ Conexión a MySQL establecida.")
             return
-
         except Exception as exc:
-
             last_error = exc
-
-            print(
-                f"Esperando MySQL... "
-                f"intento {attempt + 1}/{max_attempts}"
-            )
-
+            print(f"Esperando MySQL... intento {attempt + 1}/{max_attempts}")
             time.sleep(delay_seconds)
 
-    raise RuntimeError(
-        "No se pudo conectar a la base de datos MySQL."
-    ) from last_error
+    raise RuntimeError("No se pudo conectar a la base de datos MySQL.") from last_error
 
 
 # ============================================================
 # SEED
 # ============================================================
 
-def seed() -> None:
+INSTITUTION_NAMES = [
+    "Secretaría de Seguridad Pública",
+    "Fiscalía General de Justicia del Estado de Tamaulipas",
+]
+
+
+def seed_institutions() -> None:
+    with SessionLocal() as db:
+        existing = {
+            name
+            for name in db.scalars(select(Institution.name))
+        }
+
+        for name in INSTITUTION_NAMES:
+            if name not in existing:
+                db.add(Institution(name=name))
+
+        db.commit()
+
+    print("✓ Catálogo de instituciones verificado.")
+
+
+def seed_questions() -> None:
 
     with SessionLocal() as db:
 
-        existing_question = db.scalar(
-            select(Question.id).limit(1)
-        )
+        existing_question = db.scalar(select(Question.id).limit(1))
 
         if existing_question:
             print("✓ Las preguntas ya existen. Seed omitido.")
@@ -356,240 +278,104 @@ def seed() -> None:
         print("Insertando preguntas y respuestas...")
 
         data = [
-
             (
                 1,
                 "En qué Ley encontramos los Delitos Electorales.",
                 [
-                    (
-                        "a",
-                        "Ley General de Partidos Políticos.",
-                        False,
-                    ),
-                    (
-                        "b",
-                        "Ley General en Materia de Delitos Electorales.",
-                        True,
-                    ),
-                    (
-                        "c",
-                        "Ley General de Medios de Impugnación en Materia Electoral.",
-                        False,
-                    ),
+                    ("a", "Ley General de Partidos Políticos.", False),
+                    ("b", "Ley General en Materia de Delitos Electorales.", True),
+                    ("c", "Ley General de Medios de Impugnación en Materia Electoral.", False),
                 ],
             ),
-
             (
                 2,
                 "Es la Autoridad Electoral encargada de Organizar las elecciones en el Estado de Tamaulipas.",
                 [
-                    (
-                        "a",
-                        "Instituto Electoral de Tamaulipas (IETAM).",
-                        True,
-                    ),
-                    (
-                        "b",
-                        "Tribunal Electoral del Estado de Tamaulipas (TRIELTAM).",
-                        False,
-                    ),
-                    (
-                        "c",
-                        "Fiscalía Especializada en Delitos Electorales de Tamaulipas. (FEDE).",
-                        False,
-                    ),
-                    (
-                        "d",
-                        "Instituto Nacional Electoral (INE).",
-                        False,
-                    ),
+                    ("a", "Instituto Electoral de Tamaulipas (IETAM).", True),
+                    ("b", "Tribunal Electoral del Estado de Tamaulipas (TRIELTAM).", False),
+                    ("c", "Fiscalía Especializada en Delitos Electorales de Tamaulipas. (FEDE).", False),
+                    ("d", "Instituto Nacional Electoral (INE).", False),
                 ],
             ),
-
             (
                 3,
                 "Es la Autoridad Electoral que tiene como principal atribución conocer y resolver los medios de impugnación en materia electoral en el Estado de Tamaulipas.",
                 [
-                    (
-                        "a",
-                        "Instituto Electoral de Tamaulipas (IETAM).",
-                        False,
-                    ),
-                    (
-                        "b",
-                        "Tribunal Electoral del Estado de Tamaulipas (TRIELTAM).",
-                        True,
-                    ),
-                    (
-                        "c",
-                        "Fiscalía Especializada en Delitos Electorales de Tamaulipas. (FEDE).",
-                        False,
-                    ),
+                    ("a", "Instituto Electoral de Tamaulipas (IETAM).", False),
+                    ("b", "Tribunal Electoral del Estado de Tamaulipas (TRIELTAM).", True),
+                    ("c", "Fiscalía Especializada en Delitos Electorales de Tamaulipas. (FEDE).", False),
                 ],
             ),
-
             (
                 4,
                 "Es la Autoridad Electoral que tiene como principal atribución atender e investigar los delitos en materia electoral en el Estado de Tamaulipas.",
                 [
-                    (
-                        "a",
-                        "Instituto Electoral de Tamaulipas (IETAM).",
-                        False,
-                    ),
-                    (
-                        "b",
-                        "Tribunal Electoral del Estado de Tamaulipas (TRIELTAM).",
-                        False,
-                    ),
-                    (
-                        "c",
-                        "Fiscalía Especializada en Delitos Electorales de Tamaulipas. (FEDE).",
-                        True,
-                    ),
+                    ("a", "Instituto Electoral de Tamaulipas (IETAM).", False),
+                    ("b", "Tribunal Electoral del Estado de Tamaulipas (TRIELTAM).", False),
+                    ("c", "Fiscalía Especializada en Delitos Electorales de Tamaulipas. (FEDE).", True),
                 ],
             ),
-
             (
                 5,
                 "Es una de las formas de gobierno en las cuales se ejerce su soberanía eligiendo a sus gobernantes mediante el voto universal, libre y secreto.",
                 [
-                    (
-                        "a",
-                        "Democracia",
-                        True,
-                    ),
-                    (
-                        "b",
-                        "Monarquía",
-                        False,
-                    ),
-                    (
-                        "c",
-                        "Dictadura",
-                        False,
-                    ),
+                    ("a", "Democracia", True),
+                    ("b", "Monarquía", False),
+                    ("c", "Dictadura", False),
                 ],
             ),
-
             (
                 6,
                 "Es un derecho consagrado en el artículo 35 de la Constitución Política de los Estados Unidos Mexicanos que implica que cada ciudadana o ciudadano puede participar en elegir a sus representantes al emitir su voto. Este derecho va más allá de la elección de representantes y también se ejerce a través de otros mecanismos participativos de la democracia, tales como las consultas populares.",
                 [
-                    (
-                        "a",
-                        "Voto activo.",
-                        True,
-                    ),
-                    (
-                        "b",
-                        "Voto pasivo.",
-                        False,
-                    ),
+                    ("a", "Voto activo.", True),
+                    ("b", "Voto pasivo.", False),
                 ],
             ),
-
             (
                 7,
                 "El derecho de solicitar el registro de candidatos ante la autoridad electoral corresponde a los partidos políticos, así como a los ciudadanos que soliciten su registro de manera independiente y cumplan con los requisitos, condiciones y términos que determine la legislación, este derecho consagrado en el numeral 35 de la Constitución Política de los Estados Unidos Mexicanos se le conoce como:",
                 [
-                    (
-                        "a",
-                        "Voto activo.",
-                        False,
-                    ),
-                    (
-                        "b",
-                        "Voto pasivo.",
-                        True,
-                    ),
+                    ("a", "Voto activo.", False),
+                    ("b", "Voto pasivo.", True),
                 ],
             ),
-
             (
                 8,
                 "Es el conjunto de actos realizados en fases y que la Constitución y la Ley General de Instituciones y Procedimientos Electorales mandatan a las autoridades electorales, los partidos políticos y los ciudadanos para renovar periódicamente a los integrantes de los Poderes Legislativos y Ejecutivo federal y de las entidades federativas, así como de los ayuntamientos en los estados de la República y de las alcaldías en la Ciudad de México.",
                 [
-                    (
-                        "a",
-                        "Proceso Legislativo.",
-                        False,
-                    ),
-                    (
-                        "b",
-                        "Proceso Electoral.",
-                        True,
-                    ),
-                    (
-                        "c",
-                        "Proceso Penal.",
-                        False,
-                    ),
+                    ("a", "Proceso Legislativo.", False),
+                    ("b", "Proceso Electoral.", True),
+                    ("c", "Proceso Penal.", False),
                 ],
             ),
-
             (
                 9,
                 "Son los comicios federal y local, que coinciden exactamente en la fecha prefijada en la Legislación Electoral de un Estado y en la Ley General de Instituciones y Procedimientos Electorales, en este tipo de proceso electoral se eligen cargos de elección popular locales y federales.",
                 [
-                    (
-                        "a",
-                        "Proceso electoral extraordinario.",
-                        False,
-                    ),
-                    (
-                        "b",
-                        "Proceso electoral ordinario.",
-                        False,
-                    ),
-                    (
-                        "c",
-                        "Proceso electoral concurrente.",
-                        True,
-                    ),
+                    ("a", "Proceso electoral extraordinario.", False),
+                    ("b", "Proceso electoral ordinario.", False),
+                    ("c", "Proceso electoral concurrente.", True),
                 ],
             ),
-
             (
                 10,
                 "Es el periodo que comprende los tres días previos a la Jornada Electoral y concluye con la clausura de las casillas durante este periodo no está permitido realizar actos públicos de campaña, propaganda o proselitismo electoral publicar y difundir propaganda gubernamental.",
                 [
-                    (
-                        "a",
-                        "Precampaña",
-                        False,
-                    ),
-                    (
-                        "b",
-                        "Veda electoral",
-                        True,
-                    ),
-                    (
-                        "c",
-                        "Campaña",
-                        False,
-                    ),
+                    ("a", "Precampaña", False),
+                    ("b", "Veda electoral", True),
+                    ("c", "Campaña", False),
                 ],
             ),
         ]
 
         for number, question_text, options in data:
 
-            question = Question(
-                number=number,
-                text=question_text,
-            )
-
+            question = Question(number=number, text=question_text)
             db.add(question)
-
             db.flush()
 
-            for position, (
-                letter,
-                option_text,
-                correct,
-            ) in enumerate(options, start=1):
-
+            for position, (letter, option_text, correct) in enumerate(options, start=1):
                 db.add(
                     Option(
                         question_id=question.id,
@@ -610,21 +396,14 @@ def seed() -> None:
 # ============================================================
 
 def initialize_database() -> None:
-
     print("Inicializando base de datos...")
-
     ensure_database_exists()
-
     wait_for_database()
-
     print("Creando tablas...")
-
     Base.metadata.create_all(bind=engine)
-
     print("✓ Tablas verificadas/creadas.")
-
-    seed()
-
+    seed_institutions()
+    seed_questions()
     print("✓ Base de datos inicializada correctamente.")
 
 
@@ -634,7 +413,7 @@ def initialize_database() -> None:
 
 app = FastAPI(
     title="Evaluación FEDE - FGJ Tamaulipas",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 
@@ -644,13 +423,9 @@ app = FastAPI(
 
 origins = [
     origin.strip()
-    for origin in os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:5174",
-    ).split(",")
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:5174").split(",")
     if origin.strip()
 ]
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -667,7 +442,6 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
-
     initialize_database()
 
 
@@ -676,55 +450,118 @@ def startup_event():
 # ============================================================
 
 def get_db():
-
     db = SessionLocal()
-
     try:
         yield db
-
     finally:
         db.close()
+
+
+# ============================================================
+# SEGURIDAD / AUTH
+# ============================================================
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def create_access_token(subject: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": subject, "exp": expire}
+    return jwt.encode(payload, SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+
+def get_current_user(
+    token: str | None = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="No se pudo validar la sesión.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    if not token:
+        raise credentials_exception
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    user = db.get(User, int(user_id))
+
+    if not user:
+        raise credentials_exception
+
+    return user
 
 
 # ============================================================
 # SCHEMAS
 # ============================================================
 
-class ParticipantIn(BaseModel):
+class InstitutionOut(BaseModel):
+    id: int
+    name: str
 
-    first_name: str = Field(
-        min_length=2,
-        max_length=120,
-    )
-
-    paternal_surname: str = Field(
-        min_length=2,
-        max_length=120,
-    )
-
-    maternal_surname: str = Field(
-        min_length=2,
-        max_length=120,
-    )
+    class Config:
+        from_attributes = True
 
 
-class StartIn(ParticipantIn):
+class RegisterIn(BaseModel):
+    first_name: str = Field(min_length=2, max_length=120)
+    paternal_surname: str = Field(min_length=2, max_length=120)
+    maternal_surname: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=72)
+    institution_id: int
+    curp: str = Field(min_length=18, max_length=18)
 
-    video_completed: bool = False
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserOut(BaseModel):
+    id: int
+    first_name: str
+    paternal_surname: str
+    maternal_surname: str
+    email: EmailStr
+    curp: str
+    institution: InstitutionOut
+
+    class Config:
+        from_attributes = True
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
 
 
 class AnswerIn(BaseModel):
-
     question_id: int
     option_id: int
 
 
 class FinishIn(BaseModel):
-
-    answers: list[AnswerIn] = Field(
-        min_length=10,
-        max_length=10,
-    )
+    answers: list[AnswerIn] = Field(min_length=10, max_length=10)
 
 
 # ============================================================
@@ -733,10 +570,77 @@ class FinishIn(BaseModel):
 
 @app.get("/api/health")
 def health():
+    return {"status": "ok"}
 
-    return {
-        "status": "ok",
-    }
+
+# ============================================================
+# INSTITUTIONS
+# ============================================================
+
+@app.get("/api/institutions", response_model=list[InstitutionOut])
+def list_institutions(db: Session = Depends(get_db)):
+    return db.scalars(select(Institution).order_by(Institution.name)).all()
+
+
+# ============================================================
+# AUTH
+# ============================================================
+
+@app.post("/api/auth/register", response_model=TokenOut, status_code=201)
+def register(data: RegisterIn, db: Session = Depends(get_db)):
+
+    email = data.email.lower().strip()
+    curp = data.curp.upper().strip()
+
+    if db.scalar(select(User.id).where(User.email == email)):
+        raise HTTPException(status_code=409, detail="Ya existe una cuenta con ese correo electrónico.")
+
+    if db.scalar(select(User.id).where(User.curp == curp)):
+        raise HTTPException(status_code=409, detail="Ya existe una cuenta registrada con esa CURP.")
+
+    institution = db.get(Institution, data.institution_id)
+    if not institution:
+        raise HTTPException(status_code=400, detail="Institución inválida.")
+
+    user = User(
+        first_name=data.first_name.strip(),
+        paternal_surname=data.paternal_surname.strip(),
+        maternal_surname=data.maternal_surname.strip(),
+        email=email,
+        curp=curp,
+        hashed_password=hash_password(data.password),
+        institution_id=institution.id,
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(subject=str(user.id))
+
+    return TokenOut(access_token=token, user=UserOut.model_validate(user))
+
+
+@app.post("/api/auth/login", response_model=TokenOut)
+def login(data: LoginIn, db: Session = Depends(get_db)):
+
+    email = data.email.lower().strip()
+    user = db.scalar(select(User).where(User.email == email))
+
+    if not user or not verify_password(data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Correo electrónico o contraseña incorrectos.",
+        )
+
+    token = create_access_token(subject=str(user.id))
+
+    return TokenOut(access_token=token, user=UserOut.model_validate(user))
+
+
+@app.get("/api/auth/me", response_model=UserOut)
+def me(current_user: User = Depends(get_current_user)):
+    return UserOut.model_validate(current_user)
 
 
 # ============================================================
@@ -746,12 +650,10 @@ def health():
 @app.get("/api/questions")
 def questions(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
 
-    qs = db.scalars(
-        select(Question)
-        .order_by(Question.number)
-    ).all()
+    qs = db.scalars(select(Question).order_by(Question.number)).all()
 
     return [
         {
@@ -759,11 +661,7 @@ def questions(
             "number": q.number,
             "text": q.text,
             "options": [
-                {
-                    "id": o.id,
-                    "letter": o.letter,
-                    "text": o.text,
-                }
+                {"id": o.id, "letter": o.letter, "text": o.text}
                 for o in q.options
             ],
         }
@@ -777,38 +675,25 @@ def questions(
 
 @app.post("/api/evaluations/start")
 def start(
-    data: StartIn,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-
-    participant = Participant(
-        first_name=data.first_name.strip(),
-        paternal_surname=data.paternal_surname.strip(),
-        maternal_surname=data.maternal_surname.strip(),
-    )
-
-    db.add(participant)
-
-    db.flush()
 
     total_questions = db.query(Question).count()
 
     evaluation = Evaluation(
-        participant_id=participant.id,
-        video_completed=data.video_completed,
+        user_id=current_user.id,
         started_at=datetime.now(timezone.utc),
         total_questions=total_questions,
     )
 
     db.add(evaluation)
-
     db.commit()
-
     db.refresh(evaluation)
 
     return {
         "evaluation_id": evaluation.id,
-        "participant_id": participant.id,
+        "user": UserOut.model_validate(current_user),
     }
 
 
@@ -816,98 +701,61 @@ def start(
 # VIDEO COMPLETED
 # ============================================================
 
-@app.post(
-    "/api/evaluations/{evaluation_id}/video-completed"
-)
+@app.post("/api/evaluations/{evaluation_id}/video-completed")
 def video_completed(
     evaluation_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
 
-    evaluation = db.get(
-        Evaluation,
-        evaluation_id,
-    )
+    evaluation = db.get(Evaluation, evaluation_id)
 
-    if not evaluation:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Evaluación no encontrada.",
-        )
+    if not evaluation or evaluation.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada.")
 
     evaluation.video_completed = True
-
     db.commit()
 
-    return {
-        "video_completed": True,
-    }
+    return {"video_completed": True}
 
 
 # ============================================================
 # FINISH
 # ============================================================
 
-@app.post(
-    "/api/evaluations/{evaluation_id}/finish"
-)
+@app.post("/api/evaluations/{evaluation_id}/finish")
 def finish(
     evaluation_id: int,
     data: FinishIn,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
 
-    evaluation = db.get(
-        Evaluation,
-        evaluation_id,
-    )
+    evaluation = db.get(Evaluation, evaluation_id)
 
-    if not evaluation:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Evaluación no encontrada.",
-        )
+    if not evaluation or evaluation.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada.")
 
     if not evaluation.video_completed:
-
         raise HTTPException(
             status_code=400,
-            detail=(
-                "El video debe haberse completado "
-                "antes de contestar la evaluación."
-            ),
+            detail="El video debe haberse completado antes de contestar la evaluación.",
         )
 
     if evaluation.completed_at:
+        raise HTTPException(status_code=409, detail="La evaluación ya fue finalizada.")
 
-        raise HTTPException(
-            status_code=409,
-            detail="La evaluación ya fue finalizada.",
-        )
-
-    questions_list = db.scalars(
-        select(Question)
-        .order_by(Question.number)
-    ).all()
+    questions_list = db.scalars(select(Question).order_by(Question.number)).all()
 
     if len(data.answers) != len(questions_list):
-
-        raise HTTPException(
-            status_code=400,
-            detail="Debes responder todas las preguntas.",
-        )
+        raise HTTPException(status_code=400, detail="Debes responder todas las preguntas.")
 
     correct = 0
-
-    # Evita enviar dos respuestas para la misma pregunta
     submitted_questions = set()
 
     for item in data.answers:
 
         if item.question_id in submitted_questions:
-
             raise HTTPException(
                 status_code=400,
                 detail="No puedes responder una pregunta más de una vez.",
@@ -915,25 +763,13 @@ def finish(
 
         submitted_questions.add(item.question_id)
 
-        question = db.get(
-            Question,
-            item.question_id,
-        )
-
-        option = db.get(
-            Option,
-            item.option_id,
-        )
+        question = db.get(Question, item.question_id)
+        option = db.get(Option, item.option_id)
 
         if not question or not option:
-
-            raise HTTPException(
-                status_code=400,
-                detail="Respuesta inválida.",
-            )
+            raise HTTPException(status_code=400, detail="Respuesta inválida.")
 
         if option.question_id != question.id:
-
             raise HTTPException(
                 status_code=400,
                 detail="La opción no pertenece a la pregunta seleccionada.",
@@ -944,22 +780,17 @@ def finish(
         if is_correct:
             correct += 1
 
-        answer = Answer(
-            evaluation_id=evaluation.id,
-            question_id=question.id,
-            option_id=option.id,
-            is_correct=is_correct,
+        db.add(
+            Answer(
+                evaluation_id=evaluation.id,
+                question_id=question.id,
+                option_id=option.id,
+                is_correct=is_correct,
+            )
         )
 
-        db.add(answer)
-
     total = len(questions_list)
-
-    score = (
-        round((correct / total) * 100)
-        if total
-        else 0
-    )
+    score = round((correct / total) * 100) if total else 0
 
     evaluation.correct_answers = correct
     evaluation.total_questions = total
