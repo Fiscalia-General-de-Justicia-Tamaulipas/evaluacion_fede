@@ -321,7 +321,7 @@ const isLastQuestion = computed(() => {
     return (
         questions.value.length > 0 &&
         current.value ===
-            questions.value.length - 1
+        questions.value.length - 1
     );
 
 });
@@ -332,7 +332,7 @@ const allAnswered = computed(() => {
     return (
         questions.value.length > 0 &&
         answeredCount.value ===
-            questions.value.length
+        questions.value.length
     );
 
 });
@@ -626,11 +626,11 @@ async function restoreEvaluation() {
                     Math.min(
                         Math.max(
                             evaluation.current_question ??
-                                0,
+                            0,
                             0
                         ),
                         questions.value.length -
-                            1
+                        1
                     );
 
             }
@@ -693,7 +693,7 @@ async function startExam() {
 
             throw new Error(
                 errorData?.detail ||
-                    'No se pudo iniciar la evaluación.'
+                'No se pudo iniciar la evaluación.'
             );
 
         }
@@ -717,11 +717,11 @@ async function startExam() {
                 Math.min(
                     Math.max(
                         data.current_question ??
-                            0,
+                        0,
                         0
                     ),
                     questions.value.length -
-                        1
+                    1
                 );
 
         }
@@ -822,7 +822,7 @@ async function selectOption(
 
             throw new Error(
                 errorData?.detail ||
-                    'No se pudo guardar la respuesta.'
+                'No se pudo guardar la respuesta.'
             );
 
         }
@@ -1003,7 +1003,7 @@ async function finish() {
 
             throw new Error(
                 data.detail ||
-                    'No se pudo finalizar la evaluación.'
+                'No se pudo finalizar la evaluación.'
             );
 
         }
@@ -1109,77 +1109,53 @@ onUnmounted(() => {
 
 <template>
 
-    <div
-        class="min-h-screen bg-[#f4f4f3] text-[#575756]"
-    >
+    <div class="min-h-screen bg-[#f4f4f3] text-[#575756]">
 
         <!-- =====================================================
              HEADER
         ====================================================== -->
 
-        <header
-            class="sticky top-0 z-20 border-b border-[#dadada]
-                   bg-white/95 backdrop-blur"
-        >
+        <header class="sticky top-0 z-20 border-b border-[#dadada]
+                   bg-white/95 backdrop-blur">
 
-            <div
-                class="mx-auto flex max-w-6xl items-center
-                       gap-4 px-5 py-4"
-            >
+            <div class="mx-auto flex max-w-6xl items-center
+                       gap-4 px-5 py-4">
 
                 <div class="flex items-center gap-4">
 
-                    <img
-                        src="/logo_fgjtam.png"
-                        alt="Logo FGJ Tamaulipas"
-                        class="h-14 w-auto object-contain opacity-95"
-                    />
+                    <img src="/logo_fgjtam.png" alt="Logo FGJ Tamaulipas"
+                        class="h-14 w-auto object-contain opacity-95" />
+                    <div class="h-7 w-px bg-gray-300" />
+
+                    <img src="/logo_fede.png" alt="Logo FEDE" class="h-15 w-auto object-contain opacity-95" />
 
                 </div>
 
 
-                <div
-                    class="ml-auto flex items-center gap-4"
-                >
+                <div class="ml-auto flex items-center gap-4">
 
-                    <div
-                        class="hidden text-right sm:block"
-                    >
+                    <div class="hidden text-right sm:block">
 
-                        <p
-                            class="text-sm font-bold leading-tight"
-                        >
+                        <p class="text-sm font-bold leading-tight">
                             {{ fullName }}
                         </p>
 
-                        <p
-                            class="text-xs leading-tight
-                                   text-[#878787]"
-                        >
+                        <p class="text-xs leading-tight
+                                   text-[#878787]">
                             {{ user?.sector?.name }}
                         </p>
 
                     </div>
 
 
-                    <img
-                        src="/logo_fede.png"
-                        alt="Logo FEDE"
-                        class="h-15 w-auto object-contain opacity-95"
-                    />
 
-
-                    <button
-                        @click="logout()"
-                        title="Cerrar sesión"
-                        class="inline-flex h-9 w-9
+                    <button @click="logout()" title="Cerrar sesión" class="inline-flex h-9 w-9
                                items-center justify-center
                                rounded-lg border border-[#dadada]
                                text-[#878787]
                                transition
                                hover:border-[#575756]
-                               hover:text-[#575756]"
-                    >
+                               hover:text-[#575756]">
 
                         <LogOut :size="16" />
 
@@ -1198,28 +1174,16 @@ onUnmounted(() => {
 
         <Transition name="docs-fab">
 
-            <div
-                v-if="showDocsMenu"
-                ref="docsMenuRef"
-                class="fixed right-0 top-1/2 z-40
-                       -translate-y-1/2"
-            >
+            <div v-if="showDocsMenu" ref="docsMenuRef" class="fixed right-0 top-1/2 z-40
+                       -translate-y-1/2">
 
-                <div
-                    class="relative flex items-stretch"
-                    @mouseenter="openDocsMenu"
-                    @mouseleave="closeDocsMenu"
-                >
+                <div class="relative flex items-stretch" @mouseenter="openDocsMenu" @mouseleave="closeDocsMenu">
 
                     <!-- =================================================
                          PESTAÑA
                     ================================================== -->
 
-                    <button
-                        type="button"
-                        @click.stop="toggleDocsMenu"
-                        title="Documentos de apoyo"
-                        class="relative z-20 flex h-32 w-11
+                    <button type="button" @click.stop="toggleDocsMenu" title="Documentos de apoyo" class="relative z-20 flex h-80 w-11
                                cursor-pointer items-center
                                justify-center
                                rounded-l-2xl
@@ -1234,26 +1198,20 @@ onUnmounted(() => {
                                hover:shadow-[0_8px_30px_rgba(0,0,0,0.18)]
                                focus:outline-none
                                focus:ring-2
-                               focus:ring-[#878787]/40"
-                    >
+                               focus:ring-[#878787]/40">
 
-                        <div
-                            class="flex flex-col
-                                   items-center gap-1.5"
-                        >
+                        <div class="flex flex-col
+                                   items-center gap-1.5">
 
                             <FileText :size="18" />
 
-                            <span
-                                class="text-[9px]
+                            <span class="text-[14px]
                                        font-bold
                                        uppercase
-                                       tracking-[0.15em]"
-                                style="
+                                       tracking-[0.15em]" style="
                                     writing-mode: vertical-rl;
-                                "
-                            >
-                                PDFs
+                                ">
+                                DOCUMENTOS DE APOYO
                             </span>
 
                         </div>
@@ -1267,26 +1225,20 @@ onUnmounted(() => {
 
                     <Transition name="docs-panel">
 
-                        <div
-                            v-if="docsMenuOpen"
-                            class="absolute right-11 top-1/2
-                                   -translate-y-1/2"
-                        >
+                        <div v-if="docsMenuOpen" class="absolute right-11 top-1/2
+                                   -translate-y-1/2">
 
-                            <aside
-                                class="w-[360px]
+                            <aside class="w-[360px]
                                        overflow-hidden
                                        rounded-l-2xl
                                        border border-r-0
                                        border-[#dadada]
                                        bg-white
-                                       shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)]"
-                            >
+                                       shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)]">
 
                                 <!-- HEADER -->
 
-                                <div
-                                    class="flex items-center
+                                <div class="flex items-center
                                            justify-between
                                            border-b
                                            border-[#dadada]
@@ -1294,46 +1246,35 @@ onUnmounted(() => {
                                            from-[#575756]
                                            to-[#3f3f3e]
                                            px-4 py-3.5
-                                           text-white"
-                                >
+                                           text-white">
 
-                                    <div
-                                        class="flex items-center gap-2.5"
-                                    >
+                                    <div class="flex items-center gap-2.5">
 
-                                        <div
-                                            class="flex h-9 w-9
+                                        <div class="flex h-9 w-9
                                                    items-center
                                                    justify-center
                                                    rounded-xl
                                                    bg-white/10
                                                    ring-1
-                                                   ring-white/15"
-                                        >
+                                                   ring-white/15">
 
-                                            <FileText
-                                                :size="17"
-                                            />
+                                            <FileText :size="17" />
 
                                         </div>
 
 
                                         <div>
 
-                                            <p
-                                                class="text-sm
+                                            <p class="text-sm
                                                        font-black
-                                                       leading-tight"
-                                            >
+                                                       leading-tight">
                                                 Documentos de apoyo
                                             </p>
 
-                                            <p
-                                                class="text-[10px]
+                                            <p class="text-[10px]
                                                        text-white/60
                                                        leading-tight
-                                                       mt-0.5"
-                                            >
+                                                       mt-0.5">
                                                 Material de consulta
                                             </p>
 
@@ -1342,15 +1283,13 @@ onUnmounted(() => {
                                     </div>
 
 
-                                    <span
-                                        class="rounded-full
+                                    <span class="rounded-full
                                                bg-white/10
                                                px-2.5 py-1
                                                text-[10px]
                                                font-bold
                                                ring-1
-                                               ring-white/15"
-                                    >
+                                               ring-white/15">
                                         {{ supportDocuments.length }}
                                     </span>
 
@@ -1359,21 +1298,15 @@ onUnmounted(() => {
 
                                 <!-- DOCUMENTOS -->
 
-                                <div
-                                    class="max-h-[70vh]
+                                <div class="max-h-[70vh]
                                            space-y-1
                                            overflow-y-auto
                                            p-2
                                            [scrollbar-width:thin]
-                                           [scrollbar-color:#dadada_transparent]"
-                                >
+                                           [scrollbar-color:#dadada_transparent]">
 
-                                    <button
-                                        v-for="doc in supportDocuments"
-                                        :key="doc.id"
-                                        type="button"
-                                        @click="openDocument(doc)"
-                                        class="group/doc flex w-full
+                                    <button v-for="doc in supportDocuments" :key="doc.id" type="button"
+                                        @click="openDocument(doc)" class="group/doc flex w-full
                                                items-center gap-3
                                                rounded-xl p-2
                                                text-left
@@ -1383,13 +1316,11 @@ onUnmounted(() => {
                                                hover:shadow-sm
                                                focus:outline-none
                                                focus:ring-2
-                                               focus:ring-[#878787]/30"
-                                    >
+                                               focus:ring-[#878787]/30">
 
                                         <!-- MINIATURA -->
 
-                                        <span
-                                            class="flex h-[68px]
+                                        <span class="flex h-[68px]
                                                    w-12 shrink-0
                                                    items-center
                                                    justify-center
@@ -1402,63 +1333,43 @@ onUnmounted(() => {
                                                    transition-all
                                                    duration-200
                                                    group-hover/doc:border-[#878787]
-                                                   group-hover/doc:shadow-md"
-                                        >
+                                                   group-hover/doc:shadow-md">
 
-                                            <img
-                                                v-if="
-                                                    thumbnails[doc.id]
-                                                "
-                                                :src="
-                                                    thumbnails[doc.id]
-                                                "
-                                                :alt="
-                                                    `Portada de ${doc.title}`
-                                                "
-                                                class="h-full
+                                            <img v-if="
+                                                thumbnails[doc.id]
+                                            " :src="thumbnails[doc.id]
+                                                    " :alt="`Portada de ${doc.title}`
+                                                    " class="h-full
                                                        w-full
-                                                       object-cover"
-                                            />
+                                                       object-cover" />
 
-                                            <FileText
-                                                v-else
-                                                :size="18"
-                                                class="text-[#878787]"
-                                            />
+                                            <FileText v-else :size="18" class="text-[#878787]" />
 
                                         </span>
 
 
                                         <!-- INFORMACIÓN -->
 
-                                        <span
-                                            class="min-w-0 flex-1"
-                                        >
+                                        <span class="min-w-0 flex-1">
 
-                                            <span
-                                                class="block
+                                            <span class="block
                                                        text-xs
                                                        font-bold
                                                        leading-5
                                                        text-[#575756]
-                                                       line-clamp-2"
-                                            >
+                                                       line-clamp-2">
                                                 {{ doc.title }}
                                             </span>
 
 
-                                            <span
-                                                class="mt-1 flex
+                                            <span class="mt-1 flex
                                                        items-center
                                                        gap-1
                                                        text-[10px]
                                                        font-semibold
-                                                       text-[#878787]"
-                                            >
+                                                       text-[#878787]">
 
-                                                <FileText
-                                                    :size="11"
-                                                />
+                                                <FileText :size="11" />
 
                                                 Consultar documento
 
@@ -1469,15 +1380,12 @@ onUnmounted(() => {
 
                                         <!-- FLECHA -->
 
-                                        <ChevronRight
-                                            :size="15"
-                                            class="shrink-0
+                                        <ChevronRight :size="15" class="shrink-0
                                                    text-[#b0b0b0]
                                                    transition-all
                                                    duration-200
                                                    group-hover/doc:translate-x-0.5
-                                                   group-hover/doc:text-[#575756]"
-                                        />
+                                                   group-hover/doc:text-[#575756]" />
 
                                     </button>
 
@@ -1500,34 +1408,25 @@ onUnmounted(() => {
              MAIN
         ====================================================== -->
 
-        <main
-            class="mx-auto max-w-6xl
-                   px-5 py-8 md:py-6"
-        >
+        <main class="mx-auto max-w-6xl
+                   px-5 py-8 md:py-6">
 
             <!-- ===================================================
                  INTRO
             ==================================================== -->
 
-            <section
-                v-if="stage === 'intro'"
-                class="flex flex-col items-center"
-            >
+            <section v-if="stage === 'intro'" class="flex flex-col items-center">
 
-                <div
-                    class="mx-auto max-w-4xl text-center"
-                >
+                <div class="mx-auto max-w-4xl text-center">
 
-                    <span
-                        class="inline-flex items-center gap-2
+                    <span class="inline-flex items-center gap-2
                                rounded-full
                                bg-[#dadada]/60
                                px-3 py-1
                                text-xs
                                font-semibold
                                uppercase
-                               tracking-wider"
-                    >
+                               tracking-wider">
 
                         <PlayCircle :size="14" />
 
@@ -1536,13 +1435,11 @@ onUnmounted(() => {
                     </span>
 
 
-                    <h2
-                        class="mt-5 text-4xl
+                    <h2 class="mt-5 text-4xl
                                font-black
                                tracking-tight
                                md:text-5xl
-                               lg:text-4xl"
-                    >
+                               lg:text-4xl">
 
                         Delitos Electorales y su investigación
                         en el contexto de los Procesos Electorales
@@ -1551,13 +1448,11 @@ onUnmounted(() => {
                     </h2>
 
 
-                    <p
-                        class="mx-auto mt-5 max-w-3xl
+                    <p class="mx-auto mt-5 max-w-3xl
                                text-base
                                leading-7
                                text-[#878787]
-                               md:text-lg"
-                    >
+                               md:text-lg">
 
                         Visualiza el material completo antes de
                         acceder a la evaluación del
@@ -1571,11 +1466,9 @@ onUnmounted(() => {
                     </p>
 
 
-                    <div
-                        class="mt-7 flex items-center
+                    <div class="mt-7 flex items-center
                                justify-center gap-3
-                               text-sm text-[#878787]"
-                    >
+                               text-sm text-[#878787]">
 
                         <LockKeyhole :size="17" />
 
@@ -1586,10 +1479,7 @@ onUnmounted(() => {
 
                         </span>
 
-                        <span
-                            v-else
-                            class="font-bold text-[#575756]"
-                        >
+                        <span v-else class="font-bold text-[#575756]">
 
                             Video completado.
                             Ya puedes continuar con la evaluación.
@@ -1605,12 +1495,9 @@ onUnmounted(() => {
                      VIDEO
                 ================================================== -->
 
-                <div
-                    class="mt-8 w-full max-w-6xl"
-                >
+                <div class="mt-8 w-full max-w-6xl">
 
-                    <div
-                        class="relative mx-auto
+                    <div class="relative mx-auto
                                max-w-5xl
                                rounded-[32px]
                                border border-[#dadada]
@@ -1618,28 +1505,17 @@ onUnmounted(() => {
                                p-3
                                shadow-xl
                                shadow-black/5
-                               md:p-4"
-                    >
+                               md:p-4">
 
-                        <div
-                            class="overflow-hidden
+                        <div class="overflow-hidden
                                    rounded-[26px]
-                                   bg-[#575756]"
-                        >
+                                   bg-[#575756]">
 
-                            <video
-                                class="block aspect-video
-                                       w-full object-cover"
-                                controls
-                                playsinline
-                                preload="metadata"
-                                @ended="videoEnded"
-                            >
+                            <video class="block aspect-video
+                                       w-full object-cover" controls playsinline preload="metadata"
+                                @ended="videoEnded">
 
-                                <source
-                                    src="/curso-modulo1.mp4"
-                                    type="video/mp4"
-                                />
+                                <source src="/curso-modulo1.mp4" type="video/mp4" />
 
                                 Tu navegador no soporta
                                 video HTML5.
@@ -1649,28 +1525,22 @@ onUnmounted(() => {
                         </div>
 
 
-                        <div
-                            class="flex flex-col
+                        <div class="flex flex-col
                                    items-center
                                    justify-between
                                    gap-4 px-2 py-4
                                    text-center
                                    sm:flex-row
-                                   sm:text-left"
-                        >
+                                   sm:text-left">
 
                             <div>
 
-                                <p
-                                    class="text-sm font-bold"
-                                >
+                                <p class="text-sm font-bold">
                                     Material de capacitación
                                 </p>
 
-                                <p
-                                    class="text-xs
-                                           text-[#878787]"
-                                >
+                                <p class="text-xs
+                                           text-[#878787]">
                                     Reproducción completa requerida
                                 </p>
 
@@ -1679,13 +1549,9 @@ onUnmounted(() => {
 
                             <div>
 
-                                <button
-                                    @click="startExam"
-                                    :disabled="
-                                        !videoDone ||
-                                        loading
-                                    "
-                                    class="rounded-xl
+                                <button @click="startExam" :disabled="!videoDone ||
+                                    loading
+                                    " class="rounded-xl
                                            bg-[#575756]
                                            px-5 py-3
                                            text-sm
@@ -1694,8 +1560,7 @@ onUnmounted(() => {
                                            transition
                                            hover:bg-[#454544]
                                            disabled:cursor-not-allowed
-                                           disabled:opacity-40"
-                                >
+                                           disabled:opacity-40">
 
                                     {{
                                         loading
@@ -1720,33 +1585,24 @@ onUnmounted(() => {
                  EXAM
             ==================================================== -->
 
-            <section
-                v-else-if="stage === 'exam'"
-                class="mx-auto max-w-4xl"
-            >
+            <section v-else-if="stage === 'exam'" class="mx-auto max-w-4xl">
 
                 <!-- HEADER -->
 
-                <div
-                    class="mb-5 flex items-center
-                           justify-between"
-                >
+                <div class="mb-5 flex items-center
+                           justify-between">
 
                     <div>
 
-                        <p
-                            class="text-xs
+                        <p class="text-xs
                                    font-bold
                                    uppercase
                                    tracking-widest
-                                   text-[#878787]"
-                        >
+                                   text-[#878787]">
                             Módulo 1
                         </p>
 
-                        <h2
-                            class="text-xl font-black"
-                        >
+                        <h2 class="text-xl font-black">
                             Nociones básicas de derecho electoral
                         </h2>
 
@@ -1755,17 +1611,13 @@ onUnmounted(() => {
 
                     <div class="text-right">
 
-                        <p
-                            class="text-sm font-bold"
-                        >
+                        <p class="text-sm font-bold">
                             {{ current + 1 }}
                             /
                             {{ questions.length }}
                         </p>
 
-                        <p
-                            class="text-xs text-[#878787]"
-                        >
+                        <p class="text-xs text-[#878787]">
                             {{ answeredCount }} contestadas
                         </p>
 
@@ -1776,54 +1628,40 @@ onUnmounted(() => {
 
                 <!-- PROGRESS -->
 
-                <div
-                    class="h-2 overflow-hidden
+                <div class="h-2 overflow-hidden
                            rounded-full
-                           bg-[#dadada]"
-                >
+                           bg-[#dadada]">
 
-                    <div
-                        class="h-full
+                    <div class="h-full
                                rounded-full
                                bg-[#575756]
                                transition-all
-                               duration-500"
-                        :style="{
-                            width: progress + '%'
-                        }"
-                    />
+                               duration-500" :style="{
+                                width: progress + '%'
+                            }" />
 
                 </div>
 
 
                 <!-- QUESTION CARD -->
 
-                <div
-                    v-if="q"
-                    class="mt-8 rounded-3xl
+                <div v-if="q" class="mt-8 rounded-3xl
                            border border-[#dadada]
                            bg-white p-6
                            shadow-xl
                            shadow-black/5
-                           md:p-10"
-                >
+                           md:p-10">
 
-                    <Transition
-                        name="fade"
-                        mode="out-in"
-                    >
+                    <Transition name="fade" mode="out-in">
 
                         <div :key="q.id">
 
                             <!-- QUESTION -->
 
-                            <div
-                                class="flex items-start
-                                       gap-4"
-                            >
+                            <div class="flex items-start
+                                       gap-4">
 
-                                <span
-                                    class="flex h-10 w-10
+                                <span class="flex h-10 w-10
                                            shrink-0
                                            items-center
                                            justify-center
@@ -1831,18 +1669,15 @@ onUnmounted(() => {
                                            bg-[#575756]
                                            text-sm
                                            font-black
-                                           text-white"
-                                >
+                                           text-white">
                                     {{ q.number }}
                                 </span>
 
 
-                                <h3
-                                    class="text-xl
+                                <h3 class="text-xl
                                            font-bold
                                            leading-8
-                                           md:text-2xl"
-                                >
+                                           md:text-2xl">
                                     {{ q.text }}
                                 </h3>
 
@@ -1851,67 +1686,48 @@ onUnmounted(() => {
 
                             <!-- OPTIONS -->
 
-                            <div
-                                class="mt-8 space-y-3"
-                            >
+                            <div class="mt-8 space-y-3">
 
-                                <button
-                                    v-for="o in q.options"
-                                    :key="o.id"
-                                    @click="
-                                        selectOption(o.id)
-                                    "
-                                    class="group flex w-full
+                                <button v-for="o in q.options" :key="o.id" @click="
+                                    selectOption(o.id)
+                                    " class="group flex w-full
                                            items-start gap-4
                                            rounded-2xl
                                            border p-4
                                            text-left
-                                           transition"
-                                    :class="
-                                        answers[q.id] === o.id
-                                            ? 'border-[#575756] bg-[#f0f0ef] shadow-sm'
-                                            : 'border-[#dadada] hover:border-[#878787] hover:bg-[#fafafa]'
-                                    "
-                                >
+                                           transition" :class="answers[q.id] === o.id
+                                                ? 'border-[#575756] bg-[#f0f0ef] shadow-sm'
+                                                : 'border-[#dadada] hover:border-[#878787] hover:bg-[#fafafa]'
+                                            ">
 
-                                    <span
-                                        class="flex h-8 w-8
+                                    <span class="flex h-8 w-8
                                                shrink-0
                                                items-center
                                                justify-center
                                                rounded-lg
                                                border
                                                text-sm
-                                               font-bold"
-                                        :class="
-                                            answers[q.id] === o.id
-                                                ? 'border-[#575756] bg-[#575756] text-white'
-                                                : 'border-[#dadada] text-[#878787]'
-                                        "
-                                    >
+                                               font-bold" :class="answers[q.id] === o.id
+                                                    ? 'border-[#575756] bg-[#575756] text-white'
+                                                    : 'border-[#dadada] text-[#878787]'
+                                                ">
                                         {{ o.letter.toUpperCase() }}
                                     </span>
 
 
-                                    <span
-                                        class="pt-1
+                                    <span class="pt-1
                                                text-sm
                                                leading-6
-                                               md:text-base"
-                                    >
+                                               md:text-base">
                                         {{ o.text }}
                                     </span>
 
 
-                                    <CheckCircle2
-                                        v-if="
-                                            answers[q.id] === o.id
-                                        "
-                                        class="ml-auto
+                                    <CheckCircle2 v-if="
+                                        answers[q.id] === o.id
+                                    " class="ml-auto
                                                mt-1
-                                               shrink-0"
-                                        :size="20"
-                                    />
+                                               shrink-0" :size="20" />
 
                                 </button>
 
@@ -1920,25 +1736,18 @@ onUnmounted(() => {
 
                             <!-- SAVE STATUS -->
 
-                            <div
-                                class="mt-4
+                            <div class="mt-4
                                        text-right
                                        text-xs
-                                       text-[#878787]"
-                            >
+                                       text-[#878787]">
 
-                                <span
-                                    v-if="savingAnswer"
-                                >
+                                <span v-if="savingAnswer">
                                     Guardando respuesta…
                                 </span>
 
-                                <span
-                                    v-else-if="
-                                        answers[q.id]
-                                    "
-                                    class="font-semibold"
-                                >
+                                <span v-else-if="
+                                    answers[q.id]
+                                " class="font-semibold">
                                     Respuesta guardada
                                 </span>
 
@@ -1951,30 +1760,23 @@ onUnmounted(() => {
 
                     <!-- NAVIGATION -->
 
-                    <div
-                        class="mt-9 flex
+                    <div class="mt-9 flex
                                items-center
                                justify-between
                                border-t
                                border-[#dadada]
-                               pt-5"
-                    >
+                               pt-5">
 
-                        <button
-                            @click="previous"
-                            :disabled="
-                                current === 0 ||
-                                savingAnswer
-                            "
-                            class="inline-flex
+                        <button @click="previous" :disabled="current === 0 ||
+                            savingAnswer
+                            " class="inline-flex
                                    items-center
                                    gap-2
                                    rounded-xl
                                    px-4 py-3
                                    text-sm
                                    font-bold
-                                   disabled:opacity-30"
-                        >
+                                   disabled:opacity-30">
 
                             <ChevronLeft :size="18" />
 
@@ -1983,14 +1785,9 @@ onUnmounted(() => {
                         </button>
 
 
-                        <button
-                            v-if="!isLastQuestion"
-                            @click="next"
-                            :disabled="
-                                !canNext ||
-                                savingAnswer
-                            "
-                            class="inline-flex
+                        <button v-if="!isLastQuestion" @click="next" :disabled="!canNext ||
+                            savingAnswer
+                            " class="inline-flex
                                    items-center
                                    gap-2
                                    rounded-xl
@@ -1999,8 +1796,7 @@ onUnmounted(() => {
                                    text-sm
                                    font-bold
                                    text-white
-                                   disabled:opacity-30"
-                        >
+                                   disabled:opacity-30">
 
                             Siguiente
 
@@ -2009,15 +1805,10 @@ onUnmounted(() => {
                         </button>
 
 
-                        <button
-                            v-else
-                            @click="finish"
-                            :disabled="
-                                !allAnswered ||
-                                loading ||
-                                savingAnswer
-                            "
-                            class="inline-flex
+                        <button v-else @click="finish" :disabled="!allAnswered ||
+                            loading ||
+                            savingAnswer
+                            " class="inline-flex
                                    items-center
                                    gap-2
                                    rounded-xl
@@ -2026,8 +1817,7 @@ onUnmounted(() => {
                                    text-sm
                                    font-bold
                                    text-white
-                                   disabled:opacity-30"
-                        >
+                                   disabled:opacity-30">
 
                             {{
                                 loading
@@ -2046,30 +1836,20 @@ onUnmounted(() => {
 
                 <!-- QUESTION NAVIGATION -->
 
-                <div
-                    v-if="questions.length"
-                    class="mt-5 flex
-                           flex-wrap gap-2"
-                >
+                <div v-if="questions.length" class="mt-5 flex
+                           flex-wrap gap-2">
 
-                    <button
-                        v-for="(item, i) in questions"
-                        :key="item.id"
-                        @click="
-                            goToQuestion(i)
-                        "
-                        class="h-8 w-8
+                    <button v-for="(item, i) in questions" :key="item.id" @click="
+                        goToQuestion(i)
+                        " class="h-8 w-8
                                rounded-lg
                                text-xs
-                               font-bold"
-                        :class="
-                            i === current
-                                ? 'bg-[#575756] text-white'
-                                : answers[item.id]
-                                    ? 'bg-[#dadada] text-[#575756]'
-                                    : 'border border-[#dadada] bg-white text-[#878787]'
-                        "
-                    >
+                               font-bold" :class="i === current
+                                    ? 'bg-[#575756] text-white'
+                                    : answers[item.id]
+                                        ? 'bg-[#dadada] text-[#575756]'
+                                        : 'border border-[#dadada] bg-white text-[#878787]'
+                                ">
 
                         {{ i + 1 }}
 
@@ -2084,76 +1864,57 @@ onUnmounted(() => {
                  RESULT
             ==================================================== -->
 
-            <section
-                v-else
-                class="mx-auto max-w-3xl"
-            >
+            <section v-else class="mx-auto max-w-3xl">
 
-                <div
-                    class="overflow-hidden
+                <div class="overflow-hidden
                            rounded-[32px]
                            border border-[#dadada]
                            bg-white
                            text-center
                            shadow-xl
-                           shadow-black/5"
-                >
+                           shadow-black/5">
 
-                    <div
-                        class="bg-[#575756]
+                    <div class="bg-[#575756]
                                px-6 py-14
-                               text-white"
-                    >
+                               text-white">
 
-                        <div
-                            class="mx-auto flex
+                        <div class="mx-auto flex
                                    h-16 w-16
                                    items-center
                                    justify-center
                                    rounded-2xl
-                                   bg-white/10"
-                        >
+                                   bg-white/10">
 
-                            <ClipboardCheck
-                                :size="34"
-                            />
+                            <ClipboardCheck :size="34" />
 
                         </div>
 
 
-                        <p
-                            class="mt-5
+                        <p class="mt-5
                                    text-xs
                                    font-bold
                                    uppercase
                                    tracking-[.25em]
-                                   text-white/70"
-                        >
+                                   text-white/70">
                             Finalización
                         </p>
 
 
-                        <h2
-                            class="mt-2
+                        <h2 class="mt-2
                                    text-3xl
                                    font-black
-                                   md:text-4xl"
-                        >
+                                   md:text-4xl">
                             ¡Evaluación finalizada!
                         </h2>
 
                     </div>
 
 
-                    <div
-                        class="p-8 md:p-10"
-                    >
+                    <div class="p-8 md:p-10">
 
-                        <p
-                            class="text-lg
+                        <p class="text-lg
                                    font-bold
-                                   text-[#575756]"
-                        >
+                                   text-[#575756]">
                             {{
                                 fullName ||
                                 'Participante registrado'
@@ -2161,84 +1922,64 @@ onUnmounted(() => {
                         </p>
 
 
-                        <div
-                            class="mx-auto mt-6
+                        <div class="mx-auto mt-6
                                    grid max-w-md
-                                   grid-cols-3 gap-3"
-                        >
+                                   grid-cols-3 gap-3">
 
-                            <div
-                                class="rounded-2xl
+                            <div class="rounded-2xl
                                        border
                                        border-[#dadada]
-                                       p-4"
-                            >
+                                       p-4">
 
-                                <p
-                                    class="text-2xl
+                                <p class="text-2xl
                                            font-black
-                                           text-[#575756]"
-                                >
+                                           text-[#575756]">
                                     {{ result.score }}%
                                 </p>
 
-                                <p
-                                    class="mt-1
+                                <p class="mt-1
                                            text-xs
-                                           text-[#878787]"
-                                >
+                                           text-[#878787]">
                                     Calificación
                                 </p>
 
                             </div>
 
 
-                            <div
-                                class="rounded-2xl
+                            <div class="rounded-2xl
                                        border
                                        border-[#dadada]
-                                       p-4"
-                            >
+                                       p-4">
 
-                                <p
-                                    class="text-2xl
+                                <p class="text-2xl
                                            font-black
-                                           text-[#575756]"
-                                >
+                                           text-[#575756]">
                                     {{ result.correct }}
                                 </p>
 
-                                <p
-                                    class="mt-1
+                                <p class="mt-1
                                            text-xs
-                                           text-[#878787]"
-                                >
+                                           text-[#878787]">
                                     Correctas
                                 </p>
 
                             </div>
 
 
-                            <div
-                                class="rounded-2xl
+                            <div class="rounded-2xl
                                        border
                                        border-[#dadada]
-                                       p-4"
-                            >
+                                       p-4">
 
-                                <p
-                                    class="text-2xl
+                                <p class="text-2xl
                                            font-black
-                                           text-[#575756]"
-                                >
+                                           text-[#575756]">
                                     {{ result.total }}
                                 </p>
 
-                                <p
-                                    class="mt-1
+                                <p class="mt-1
                                            text-xs
-                                           text-[#878787]"
-                                >
+                                           text-[#878787]">
                                     Preguntas
                                 </p>
 
@@ -2247,12 +1988,10 @@ onUnmounted(() => {
                         </div>
 
 
-                        <p
-                            class="mt-6
+                        <p class="mt-6
                                    text-base
                                    leading-7
-                                   text-[#878787]"
-                        >
+                                   text-[#878787]">
 
                             Gracias por completar el módulo de
                             capacitación. Tu participación ha sido
@@ -2262,9 +2001,7 @@ onUnmounted(() => {
                         </p>
 
 
-                        <button
-                            @click="restart"
-                            class="mt-8 inline-flex
+                        <button @click="restart" class="mt-8 inline-flex
                                    items-center
                                    gap-2
                                    rounded-xl
@@ -2273,8 +2010,7 @@ onUnmounted(() => {
                                    text-sm
                                    font-bold
                                    text-white
-                                   hover:bg-[#454544]"
-                        >
+                                   hover:bg-[#454544]">
 
                             <RotateCcw :size="17" />
 
@@ -2295,13 +2031,11 @@ onUnmounted(() => {
              FOOTER
         ====================================================== -->
 
-        <footer
-            class="mx-auto max-w-6xl
+        <footer class="mx-auto max-w-6xl
                    px-5 pb-8
                    text-center
                    text-xs
-                   text-[#878787]"
-        >
+                   text-[#878787]">
 
             Fiscalía General de Justicia
             del Estado de Tamaulipas
@@ -2320,74 +2054,57 @@ onUnmounted(() => {
 
         <Transition name="fade">
 
-            <div
-                v-if="viewingDoc"
-                @click.self="closeViewer"
-                class="fixed inset-0 z-50
+            <div v-if="viewingDoc" @click.self="closeViewer" class="fixed inset-0 z-50
                        flex items-center
                        justify-center
                        bg-black/60
                        p-4
                        backdrop-blur-sm
-                       md:p-8"
-            >
+                       md:p-8">
 
-                <div
-                    class="flex h-full
+                <div class="flex h-full
                            w-full max-w-5xl
                            flex-col
                            overflow-hidden
                            rounded-2xl
                            bg-white
-                           shadow-2xl"
-                >
+                           shadow-2xl">
 
                     <!-- HEADER PDF -->
 
-                    <div
-                        class="flex items-center
+                    <div class="flex items-center
                                justify-between
                                border-b
                                border-[#dadada]
-                               px-5 py-3"
-                    >
+                               px-5 py-3">
 
-                        <div
-                            class="flex min-w-0
+                        <div class="flex min-w-0
                                    items-center
-                                   gap-3"
-                        >
+                                   gap-3">
 
-                            <span
-                                class="flex h-8 w-8
+                            <span class="flex h-8 w-8
                                        shrink-0
                                        items-center
                                        justify-center
                                        rounded-lg
                                        bg-[#f0f0ef]
-                                       text-[#575756]"
-                            >
+                                       text-[#575756]">
 
                                 <FileText :size="16" />
 
                             </span>
 
 
-                            <p
-                                class="truncate
+                            <p class="truncate
                                        text-sm
-                                       font-bold"
-                            >
+                                       font-bold">
                                 {{ viewingDoc.title }}
                             </p>
 
                         </div>
 
 
-                        <button
-                            @click="closeViewer"
-                            title="Cerrar"
-                            class="inline-flex
+                        <button @click="closeViewer" title="Cerrar" class="inline-flex
                                    h-8 w-8
                                    shrink-0
                                    items-center
@@ -2396,8 +2113,7 @@ onUnmounted(() => {
                                    text-[#878787]
                                    transition
                                    hover:bg-[#f4f4f3]
-                                   hover:text-[#575756]"
-                        >
+                                   hover:text-[#575756]">
 
                             <X :size="18" />
 
@@ -2408,14 +2124,10 @@ onUnmounted(() => {
 
                     <!-- PDF -->
 
-                    <iframe
-                        :src="viewingDoc.url"
-                        :title="viewingDoc.title"
-                        class="h-full
+                    <iframe :src="viewingDoc.url" :title="viewingDoc.title" class="h-full
                                w-full
                                flex-1
-                               bg-[#f4f4f3]"
-                    />
+                               bg-[#f4f4f3]" />
 
                 </div>
 
@@ -2429,7 +2141,6 @@ onUnmounted(() => {
 
 
 <style scoped>
-
 /* =========================================================
    FADE GENERAL
    ========================================================= */
@@ -2469,8 +2180,7 @@ onUnmounted(() => {
     opacity: 0;
 
     transform:
-        translateX(40px)
-        translateY(-50%);
+        translateX(40px) translateY(-50%);
 
 }
 
@@ -2482,10 +2192,8 @@ onUnmounted(() => {
 .docs-panel-enter-active {
 
     transition:
-        opacity 0.25s
-            cubic-bezier(0.16, 1, 0.3, 1),
-        transform 0.25s
-            cubic-bezier(0.16, 1, 0.3, 1);
+        opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 
 }
 
@@ -2545,5 +2253,4 @@ onUnmounted(() => {
     background: #878787;
 
 }
-
 </style>
