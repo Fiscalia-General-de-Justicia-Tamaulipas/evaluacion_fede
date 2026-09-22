@@ -174,6 +174,10 @@ const stage = ref<
 
 const videoDone = ref(false);
 
+const videoModalOpen = ref(false);
+
+const modalVideoRef = ref<HTMLVideoElement | null>(null);
+
 const evaluationId = ref<number | null>(null);
 
 const questions = ref<Question[]>([]);
@@ -543,6 +547,8 @@ function handleEscape(
 
         viewingDoc.value = null;
 
+        closeVideoModal();
+
     }
 
 }
@@ -659,6 +665,26 @@ function videoEnded() {
 }
 
 
+function openVideoModal() {
+
+    videoModalOpen.value = true;
+
+    document.body.style.overflow = 'hidden';
+
+}
+
+
+function closeVideoModal() {
+
+    videoModalOpen.value = false;
+
+    modalVideoRef.value?.pause();
+
+    document.body.style.overflow = '';
+
+}
+
+
 /* =========================================================
    START / RESUME EXAM
    ========================================================= */
@@ -671,6 +697,8 @@ async function startExam() {
     ) {
         return;
     }
+
+    closeVideoModal();
 
     loading.value = true;
 
@@ -1096,6 +1124,8 @@ onUnmounted(() => {
         handleEscape
     );
 
+    document.body.style.overflow = '';
+
     if (hoverCloseTimer) {
 
         clearTimeout(hoverCloseTimer);
@@ -1507,22 +1537,32 @@ onUnmounted(() => {
                                shadow-black/5
                                md:p-4">
 
-                        <div class="overflow-hidden
-                                   rounded-[26px]
-                                   bg-[#575756]">
-
-                            <video class="block aspect-video
-                                       w-full object-cover" controls playsinline preload="metadata"
-                                @ended="videoEnded">
-
+                        <button
+                            type="button"
+                            class="group relative block w-full overflow-hidden rounded-[26px] bg-[#575756] text-left focus:outline-none focus:ring-2 focus:ring-[#575756] focus:ring-offset-2"
+                            aria-label="Abrir video de capacitación"
+                            @click="openVideoModal"
+                        >
+                            <video
+                                class="block aspect-video w-full object-cover"
+                                muted
+                                playsinline
+                                preload="metadata"
+                            >
                                 <source src="/curso-modulo1.mp4" type="video/mp4" />
-
-                                Tu navegador no soporta
-                                video HTML5.
-
+                                Tu navegador no soporta video HTML5.
                             </video>
 
-                        </div>
+                            <span class="absolute inset-0 flex items-center justify-center bg-black/20 transition group-hover:bg-black/35">
+                                <span class="flex h-16 w-16 items-center justify-center rounded-full bg-white/95 text-[#575756] shadow-xl transition group-hover:scale-105">
+                                    <PlayCircle :size="34" />
+                                </span>
+                            </span>
+
+                            <span class="absolute bottom-4 left-4 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white">
+                                Ver material introductorio
+                            </span>
+                        </button>
 
 
                         <div class="flex flex-col
@@ -1547,36 +1587,83 @@ onUnmounted(() => {
                             </div>
 
 
-                            <div>
-
-                                <button @click="startExam" :disabled="!videoDone ||
-                                    loading
-                                    " class="rounded-xl
-                                           bg-[#575756]
-                                           px-5 py-3
-                                           text-sm
-                                           font-bold
-                                           text-white
-                                           transition
-                                           hover:bg-[#454544]
-                                           disabled:cursor-not-allowed
-                                           disabled:opacity-40">
-
-                                    {{
-                                        loading
-                                            ? 'Preparando evaluación…'
-                                            : 'Contestar evaluación'
-                                    }}
-
-                                </button>
-
-                            </div>
+                            <span class="text-xs font-semibold text-[#878787]">
+                                Abre el video para reproducirlo.
+                            </span>
 
                         </div>
 
                     </div>
 
                 </div>
+
+
+            <Transition name="fade">
+
+                <div
+                    v-if="videoModalOpen"
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm md:p-8"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="video-modal-title"
+                    @click.self="closeVideoModal"
+                >
+                    <div class="relative w-full max-w-5xl rounded-3xl bg-white p-4 shadow-2xl md:p-6">
+                        <div class="mb-4 flex items-center justify-between gap-4">
+                            <div>
+                                <p id="video-modal-title" class="text-lg font-black text-[#575756]">
+                                    Material de capacitación
+                                </p>
+                                <p class="text-sm text-[#878787]">
+                                    Reproduce el video completo para habilitar la evaluación.
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                title="Cerrar video"
+                                aria-label="Cerrar video"
+                                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#878787] transition hover:bg-[#f4f4f3] hover:text-[#575756]"
+                                @click="closeVideoModal"
+                            >
+                                <X :size="20" />
+                            </button>
+                        </div>
+
+                        <div class="mx-auto overflow-hidden rounded-2xl bg-black">
+                            <video
+                                ref="modalVideoRef"
+                                class="mx-auto block max-h-[65vh] w-full object-contain"
+                                controls
+                                autoplay
+                                playsinline
+                                preload="metadata"
+                                @ended="videoEnded"
+                            >
+                                <source src="/curso-modulo1.mp4" type="video/mp4" />
+                                Tu navegador no soporta video HTML5.
+                            </video>
+                        </div>
+
+                        <div class="mt-5 flex flex-col items-center justify-between gap-4 border-t border-[#dadada] pt-5 sm:flex-row">
+                            <p class="text-sm text-[#878787]">
+                                <span v-if="!videoDone">La evaluación se habilita al terminar el video.</span>
+                                <span v-else class="font-bold text-[#575756]">Video completado. Ya puedes continuar.</span>
+                            </p>
+
+                            <button
+                                type="button"
+                                :disabled="!videoDone || loading"
+                                class="rounded-xl bg-[#575756] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#454544] disabled:cursor-not-allowed disabled:opacity-40"
+                                @click="startExam"
+                            >
+                                {{ loading ? 'Preparando evaluación…' : 'Contestar evaluación' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </Transition>
 
             </section>
 
