@@ -102,11 +102,11 @@ onMounted(loadQuestions);
         <div class="ml-auto flex items-center gap-4">
           <div class="hidden text-right sm:block">
             <p class="text-sm font-bold leading-tight">{{ fullName }}</p>
-            <p class="text-xs text-[#878787] leading-tight">{{ user?.institution?.name }}</p>
+            <p class="text-xs text-[#878787] leading-tight">{{ user?.sector?.name }}</p>
           </div>
           <img src="/logo_fede.png" alt="Logo FEDE" class="h-15 w-auto object-contain opacity-95" />
           <button
-            @click="logout(); location.reload();"
+            @click="logout();"
             title="Cerrar sesión"
             class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dadada] text-[#878787] transition hover:border-[#575756] hover:text-[#575756]"
           >

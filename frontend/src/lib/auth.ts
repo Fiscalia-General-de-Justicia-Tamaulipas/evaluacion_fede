@@ -107,7 +107,6 @@ async function register(payload: {
   maternal_surname: string;
   email: string;
   password: string;
-  institution_id: number;
   curp: string;
 }) {
   const response = await fetch(`${API}/api/auth/register`, {
