@@ -126,6 +126,7 @@ type EvaluationStartResponse = {
     resumed: boolean;
     video_completed: boolean;
     current_question: number;
+    question_order: number[];
     answers: SavedAnswer[];
 };
 
@@ -137,6 +138,7 @@ type CurrentEvaluationResponse = {
         video_completed: boolean;
         started_at: string;
         current_question: number;
+        question_order: number[];
         answered_count: number;
         total_questions: number;
         answers: SavedAnswer[];
@@ -301,10 +303,23 @@ const progress = computed(() => {
     }
 
     return (
-        ((current.value + 1) /
+        (answeredCount.value /
             questions.value.length) *
         100
     );
+
+});
+
+
+const maxReachableIndex = computed(() => {
+
+    const nextUnanswered = questions.value.findIndex(
+        (question) => answers.value[question.id] == null
+    );
+
+    return nextUnanswered === -1
+        ? Math.max(questions.value.length - 1, 0)
+        : nextUnanswered;
 
 });
 
@@ -315,17 +330,9 @@ const canNext = computed(() => {
         return false;
     }
 
-    return answers.value[q.value.id] != null;
-
-});
-
-
-const isLastQuestion = computed(() => {
-
     return (
-        questions.value.length > 0 &&
-        current.value ===
-        questions.value.length - 1
+        answers.value[q.value.id] != null &&
+        current.value < maxReachableIndex.value
     );
 
 });
@@ -373,6 +380,28 @@ async function loadQuestions() {
 
         questions.value = [];
     }
+}
+
+
+function applyQuestionOrder(questionOrder: number[]) {
+
+    const questionsById = new Map(
+        questions.value.map((question) => [
+            question.id,
+            question,
+        ])
+    );
+
+    const orderedQuestions = questionOrder
+        .map((questionId) => questionsById.get(questionId))
+        .filter((question): question is Question => Boolean(question));
+
+    questions.value = [
+        ...orderedQuestions,
+        ...questions.value.filter(
+            (question) => !questionOrder.includes(question.id)
+        ),
+    ];
 }
 
 
@@ -620,6 +649,10 @@ async function restoreEvaluation() {
             evaluation.answers ?? []
         );
 
+        applyQuestionOrder(
+            evaluation.question_order ?? []
+        );
+
         if (
             evaluation.video_completed
         ) {
@@ -737,6 +770,10 @@ async function startExam() {
             data.answers ?? []
         );
 
+        applyQuestionOrder(
+            data.question_order ?? []
+        );
+
         if (
             questions.value.length > 0
         ) {
@@ -812,6 +849,9 @@ async function selectOption(
     const questionId =
         q.value.id;
 
+    const previousOptionId =
+        answers.value[questionId];
+
     answers.value[
         questionId
     ] = optionId;
@@ -862,9 +902,11 @@ async function selectOption(
             error
         );
 
-        delete answers.value[
-            questionId
-        ];
+        if (previousOptionId == null) {
+            delete answers.value[questionId];
+        } else {
+            answers.value[questionId] = previousOptionId;
+        }
 
     } finally {
 
@@ -926,7 +968,7 @@ async function saveCurrentProgress(
 
 
 /* =========================================================
-   PREVIOUS
+   QUESTION PAGINATION
    ========================================================= */
 
 async function previous() {
@@ -936,53 +978,33 @@ async function previous() {
     }
 
     current.value--;
-
     await saveCurrentProgress();
 
 }
 
-
-/* =========================================================
-   NEXT
-   ========================================================= */
-
 async function next() {
-
-    if (
-        current.value >=
-        questions.value.length - 1
-    ) {
-        return;
-    }
 
     if (!canNext.value) {
         return;
     }
 
     current.value++;
-
     await saveCurrentProgress();
 
 }
 
-
-/* =========================================================
-   DIRECT QUESTION NAVIGATION
-   ========================================================= */
-
-async function goToQuestion(
-    index: number
-) {
+async function goToQuestion(index: number) {
 
     if (
         index < 0 ||
-        index >= questions.value.length
+        index > maxReachableIndex.value ||
+        index >= questions.value.length ||
+        index === current.value
     ) {
         return;
     }
 
     current.value = index;
-
     await saveCurrentProgress();
 
 }
@@ -1726,7 +1748,7 @@ onUnmounted(() => {
                                            text-sm
                                            font-black
                                            text-white">
-                                    {{ q.number }}
+                                    {{ current + 1 }}
                                 </span>
 
 
@@ -1816,102 +1838,38 @@ onUnmounted(() => {
 
                     <!-- NAVIGATION -->
 
-                    <div class="mt-9 flex
-                               items-center
-                               justify-between
-                               border-t
-                               border-[#dadada]
-                               pt-5">
+                </div>
 
-                        <button @click="previous" :disabled="current === 0 ||
-                            savingAnswer
-                            " class="inline-flex
-                                   items-center
-                                   gap-2
-                                   rounded-xl
-                                   px-4 py-3
-                                   text-sm
-                                   font-bold
-                                   disabled:opacity-30">
+                <nav v-if="questions.length" aria-label="Paginación de preguntas" class="mt-5 flex flex-wrap items-center justify-between gap-3">
 
-                            <ChevronLeft :size="18" />
+                    <button type="button" @click="previous" :disabled="current === 0 || savingAnswer" aria-label="Pregunta anterior" title="Pregunta anterior" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#dadada] bg-white text-[#575756] disabled:opacity-35">
+                        <ChevronLeft :size="18" />
+                    </button>
 
-                            Anterior
+                    <div class="flex flex-1 flex-wrap items-center justify-center gap-2">
 
-                        </button>
-
-
-                        <button v-if="!isLastQuestion" @click="next" :disabled="!canNext ||
-                            savingAnswer
-                            " class="inline-flex
-                                   items-center
-                                   gap-2
-                                   rounded-xl
-                                   bg-[#575756]
-                                   px-5 py-3
-                                   text-sm
-                                   font-bold
-                                   text-white
-                                   disabled:opacity-30">
-
-                            Siguiente
-
-                            <ChevronRight :size="18" />
-
-                        </button>
-
-
-                        <button v-else @click="finish" :disabled="!allAnswered ||
-                            loading ||
-                            savingAnswer
-                            " class="inline-flex
-                                   items-center
-                                   gap-2
-                                   rounded-xl
-                                   bg-[#575756]
-                                   px-5 py-3
-                                   text-sm
-                                   font-bold
-                                   text-white
-                                   disabled:opacity-30">
-
-                            {{
-                                loading
-                                    ? 'Guardando…'
-                                    : 'Finalizar evaluación'
-                            }}
-
-                            <CheckCircle2 :size="18" />
-
+                        <button v-for="(item, index) in questions" :key="item.id" type="button" @click="goToQuestion(index)" :disabled="index > maxReachableIndex || savingAnswer" :aria-label="`Pregunta ${index + 1}${answers[item.id] ? ', respondida' : ', pendiente'}`" :aria-current="index === current ? 'page' : undefined" :title="`Pregunta ${index + 1}`" class="h-9 w-9 rounded-lg border text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-35" :class="index === current
+                            ? 'border-[#575756] bg-[#575756] text-white'
+                            : answers[item.id]
+                                ? 'border-[#4f7b63] bg-[#e8f0eb] text-[#315a43] hover:bg-[#dce9e0]'
+                                : 'border-[#dadada] bg-white text-[#878787] hover:border-[#878787]'">
+                            {{ index + 1 }}
                         </button>
 
                     </div>
 
-                </div>
-
-
-                <!-- QUESTION NAVIGATION -->
-
-                <div v-if="questions.length" class="mt-5 flex
-                           flex-wrap gap-2">
-
-                    <button v-for="(item, i) in questions" :key="item.id" @click="
-                        goToQuestion(i)
-                        " class="h-8 w-8
-                               rounded-lg
-                               text-xs
-                               font-bold" :class="i === current
-                                    ? 'bg-[#575756] text-white'
-                                    : answers[item.id]
-                                        ? 'bg-[#dadada] text-[#575756]'
-                                        : 'border border-[#dadada] bg-white text-[#878787]'
-                                ">
-
-                        {{ i + 1 }}
-
+                    <button v-if="canNext" type="button" @click="next" :disabled="savingAnswer" aria-label="Pregunta siguiente" title="Pregunta siguiente" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#dadada] bg-white text-[#575756] disabled:opacity-35">
+                        <ChevronRight :size="18" />
                     </button>
 
-                </div>
+                    <button v-else-if="allAnswered && current === maxReachableIndex" type="button" @click="finish" :disabled="loading || savingAnswer" class="inline-flex items-center gap-2 rounded-lg bg-[#575756] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-35">
+                        {{ loading ? 'Guardando…' : 'Finalizar' }}
+                        <CheckCircle2 :size="18" />
+                    </button>
+
+                    <span v-else class="h-10 w-10" aria-hidden="true" />
+
+                </nav>
 
             </section>
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from secrets import SystemRandom
 from urllib.parse import quote_plus
 
 from dotenv import load_dotenv
@@ -709,6 +711,11 @@ class Evaluation(Base):
         Integer,
         default=0,
         nullable=False,
+    )
+
+    question_order: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
     )
 
 
@@ -1471,6 +1478,87 @@ def ensure_evaluation_columns() -> None:
                     """
                 )
             )
+
+        if "question_order" not in columns:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE evaluations
+                    ADD COLUMN question_order TEXT NULL
+                    """
+                )
+            )
+
+
+def get_evaluation_question_order(
+    db: Session,
+    evaluation: Evaluation,
+) -> list[int]:
+    question_ids = db.scalars(
+        select(Question.id)
+        .order_by(Question.number)
+    ).all()
+
+    try:
+        order = json.loads(evaluation.question_order or "[]")
+    except (json.JSONDecodeError, TypeError):
+        order = []
+
+    if not isinstance(order, list):
+        order = []
+
+    valid_question_ids = set(question_ids)
+    order = list(dict.fromkeys(
+        question_id
+        for question_id in order
+        if type(question_id) is int
+        and question_id in valid_question_ids
+    ))
+    missing_ids = [
+        question_id
+        for question_id in question_ids
+        if question_id not in order
+    ]
+
+    if not evaluation.question_order:
+        answered_ids = set(db.scalars(
+            select(Answer.question_id)
+            .where(Answer.evaluation_id == evaluation.id)
+        ).all())
+        order = [
+            question_id
+            for question_id in question_ids
+            if question_id in answered_ids
+        ]
+        missing_ids = [
+            question_id
+            for question_id in question_ids
+            if question_id not in answered_ids
+        ]
+
+    SystemRandom().shuffle(missing_ids)
+    order.extend(missing_ids)
+
+    evaluation.question_order = json.dumps(order)
+    db.flush()
+    return order
+
+
+def get_next_unanswered_index(
+    db: Session,
+    evaluation: Evaluation,
+    question_order: list[int],
+) -> int:
+    answered_ids = set(db.scalars(
+        select(Answer.question_id)
+        .where(Answer.evaluation_id == evaluation.id)
+    ).all())
+
+    for index, question_id in enumerate(question_order):
+        if question_id not in answered_ids:
+            return index
+
+    return max(len(question_order) - 1, 0)
 
 
 def ensure_answer_unique_constraint() -> None:
@@ -2304,6 +2392,26 @@ def get_current_evaluation(
             "evaluation": None,
         }
 
+    had_question_order = bool(evaluation.question_order)
+    question_order = get_evaluation_question_order(
+        db,
+        evaluation,
+    )
+    if not had_question_order:
+        evaluation.current_question = min(
+            get_next_unanswered_index(
+                db,
+                evaluation,
+                question_order,
+            ),
+            max(len(question_order) - 1, 0),
+        )
+    evaluation.current_question = min(
+        evaluation.current_question,
+        max(len(question_order) - 1, 0),
+    )
+    db.commit()
+
     answers = db.scalars(
         select(Answer)
         .where(
@@ -2322,6 +2430,8 @@ def get_current_evaluation(
                 evaluation.started_at,
             "current_question":
                 evaluation.current_question,
+            "question_order":
+                question_order,
             "answered_count":
                 len(answers),
             "total_questions":
@@ -2372,6 +2482,28 @@ def start_evaluation(
 
     if existing_evaluation:
 
+        had_question_order = bool(
+            existing_evaluation.question_order
+        )
+        question_order = get_evaluation_question_order(
+            db,
+            existing_evaluation,
+        )
+        if not had_question_order:
+            existing_evaluation.current_question = min(
+                get_next_unanswered_index(
+                    db,
+                    existing_evaluation,
+                    question_order,
+                ),
+                max(len(question_order) - 1, 0),
+            )
+        existing_evaluation.current_question = min(
+            existing_evaluation.current_question,
+            max(len(question_order) - 1, 0),
+        )
+        db.commit()
+
         answers = db.scalars(
             select(Answer)
             .where(
@@ -2391,6 +2523,9 @@ def start_evaluation(
 
             "current_question":
                 existing_evaluation.current_question,
+
+            "question_order":
+                question_order,
 
             "answers": [
                 {
@@ -2428,6 +2563,12 @@ def start_evaluation(
             detail="No existen preguntas configuradas.",
         )
 
+    question_order = db.scalars(
+        select(Question.id)
+        .order_by(Question.number)
+    ).all()
+    SystemRandom().shuffle(question_order)
+
     evaluation = Evaluation(
         user_id=current_user.id,
         started_at=datetime.now(
@@ -2436,6 +2577,7 @@ def start_evaluation(
         total_questions=total_questions,
         video_completed=False,
         current_question=0,
+        question_order=json.dumps(question_order),
     )
 
     db.add(evaluation)
@@ -2456,6 +2598,9 @@ def start_evaluation(
 
         "current_question":
             0,
+
+        "question_order":
+            question_order,
 
         "answers":
             [],
@@ -2603,47 +2748,53 @@ def save_answer(
             detail="La opción no pertenece a la pregunta.",
         )
 
-    # --------------------------------------------------------
-    # RESPUESTA EXISTENTE
-    # --------------------------------------------------------
+    question_order = get_evaluation_question_order(
+        db,
+        evaluation,
+    )
 
-    answer = db.scalar(
+    existing_answer = db.scalar(
         select(Answer)
         .where(
-            Answer.evaluation_id ==
-            evaluation.id,
-
-            Answer.question_id ==
-            question.id,
+            Answer.evaluation_id == evaluation.id,
+            Answer.question_id == question.id,
         )
     )
 
-    if answer:
+    if existing_answer:
+        existing_answer.option_id = option.id
+        existing_answer.is_correct = bool(option.is_correct)
+        db.commit()
+        return {
+            "success": True,
+            "evaluation_id": evaluation.id,
+            "question_id": question.id,
+            "option_id": option.id,
+            "is_correct": existing_answer.is_correct,
+        }
 
-        answer.option_id = option.id
+    expected_index = get_next_unanswered_index(
+        db,
+        evaluation,
+        question_order,
+    )
 
-        answer.is_correct = bool(
-            option.is_correct
+    if (
+        expected_index >= len(question_order)
+        or question_order[expected_index] != question.id
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Debes responder la siguiente pregunta pendiente.",
         )
 
-    else:
-
-        answer = Answer(
-            evaluation_id=
-                evaluation.id,
-
-            question_id=
-                question.id,
-
-            option_id=
-                option.id,
-
-            is_correct=
-                bool(option.is_correct),
-        )
-
-        db.add(answer)
-
+    answer = Answer(
+        evaluation_id=evaluation.id,
+        question_id=question.id,
+        option_id=option.id,
+        is_correct=bool(option.is_correct),
+    )
+    db.add(answer)
     db.commit()
 
     db.refresh(answer)
@@ -2704,10 +2855,23 @@ def save_evaluation_progress(
             detail="La evaluación ya fue finalizada.",
         )
 
-    if data.current_question >= evaluation.total_questions:
+    question_order = get_evaluation_question_order(
+        db,
+        evaluation,
+    )
+    next_unanswered = get_next_unanswered_index(
+        db,
+        evaluation,
+        question_order,
+    )
+
+    if (
+        data.current_question >= len(question_order)
+        or data.current_question > next_unanswered
+    ):
         raise HTTPException(
             status_code=400,
-            detail="La pregunta indicada no es válida.",
+            detail="No puedes avanzar más allá de las preguntas pendientes.",
         )
 
     evaluation.current_question = (
