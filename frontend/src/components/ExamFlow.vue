@@ -12,16 +12,16 @@ import {
     ChevronRight,
     CheckCircle2,
     PlayCircle,
-    ClipboardCheck,
     LockKeyhole,
-    RotateCcw,
-    LogOut,
     FileText,
     X,
     ArrowLeft,
 } from 'lucide-vue-next';
 
 import { useAuth } from '../lib/auth';
+import EvaluationResult from './EvaluationResult.vue';
+import { openCertificateWindow, renderCertificateDraft } from '../lib/certificate';
+import InstitutionalHeader from './InstitutionalHeader.vue';
 
 const emit = defineEmits<{
     (e: 'back'): void;
@@ -140,6 +140,13 @@ type CurrentEvaluationResponse = {
 
     evaluation: {
         id: number;
+        completed?: boolean;
+        completed_at?: string;
+        score?: number | null;
+        correct?: number | null;
+        attempt_number?: number;
+        attempts_remaining?: number;
+        passed?: boolean;
         video_completed: boolean;
         started_at: string;
         current_question: number;
@@ -154,6 +161,8 @@ type Result = {
     score: number;
     correct: number;
     total: number;
+    attempt: number;
+    attemptsRemaining: number;
 };
 
 
@@ -197,10 +206,14 @@ const loading = ref(false);
 
 const savingAnswer = ref(false);
 
+const message = ref('');
+
 const result = ref<Result>({
     score: 0,
     correct: 0,
     total: 0,
+    attempt: 0,
+    attemptsRemaining: 3,
 });
 
 
@@ -644,6 +657,18 @@ async function restoreEvaluation() {
         const evaluation =
             data.evaluation;
 
+        if (evaluation.completed) {
+            result.value = {
+                score: evaluation.score ?? 0,
+                correct: evaluation.correct ?? 0,
+                total: evaluation.total_questions ?? 0,
+                attempt: evaluation.attempt_number ?? 1,
+                attemptsRemaining: evaluation.attempts_remaining ?? 0,
+            };
+            stage.value = 'result';
+            return;
+        }
+
         evaluationId.value =
             evaluation.id;
 
@@ -1030,6 +1055,10 @@ async function finish() {
         return;
     }
 
+    if (!window.confirm('Al finalizar, tus respuestas quedarán registradas y no podrás modificarlas. ¿Deseas continuar?')) {
+        return;
+    }
+
     loading.value = true;
 
     try {
@@ -1067,21 +1096,47 @@ async function finish() {
             score: data.score,
             correct: data.correct,
             total: data.total,
+            attempt: data.attempt_number,
+            attemptsRemaining: Math.max(0, 3 - data.attempt_number),
         };
 
         stage.value = 'result';
 
-    } catch (error) {
+    } catch (error: any) {
 
         console.error(
             'Error finalizando evaluación:',
             error
         );
+        message.value = error?.message || 'No se pudo finalizar la evaluación. Revisa tu conexión e inténtalo de nuevo.';
 
     } finally {
 
         loading.value = false;
 
+    }
+}
+
+async function openCertificate() {
+    const popup = openCertificateWindow();
+    if (!popup) {
+        message.value = 'El navegador bloqueó la ventana. Permite ventanas emergentes e inténtalo de nuevo.';
+        return;
+    }
+    try {
+        const response = await apiFetch('/api/certificates/1');
+        const data = await response.json().catch(() => null);
+        if (!response.ok && response.status !== 404) throw new Error(data?.detail || 'No se pudo consultar la información de la constancia.');
+        renderCertificateDraft(popup, {
+            moduleId: 1,
+            moduleName: data?.module_name || 'Nociones básicas de derecho electoral',
+            participantName: data?.user_name || fullName.value,
+            score: data?.score ?? result.value.score,
+            issuedAt: data?.issued_at || new Date(),
+        });
+    } catch (error: any) {
+        popup.close();
+        message.value = error?.message || 'No se pudo generar la constancia.';
     }
 }
 
@@ -1091,9 +1146,12 @@ async function finish() {
    ========================================================= */
 
 function restart() {
-
-    window.location.reload();
-
+    current.value = 0;
+    answers.value = {};
+    evaluationId.value = null;
+    videoDone.value = false;
+    result.value = { score: 0, correct: 0, total: 0, attempt: 0, attemptsRemaining: 3 };
+    stage.value = 'intro';
 }
 
 
@@ -1172,67 +1230,15 @@ onUnmounted(() => {
              HEADER
         ====================================================== -->
 
-        <header class="sticky top-0 z-20 border-b border-[#dadada]
-                   bg-white/95 backdrop-blur">
-
-            <div class="mx-auto flex max-w-6xl items-center
-                       gap-4 px-5 py-4">
-
-                <div class="flex items-center gap-4">
-
-                    <img src="/logo_fgjtam.png" alt="Logo FGJ Tamaulipas"
-                        class="h-14 w-auto object-contain opacity-95" />
-                    <div class="h-7 w-px bg-gray-300" />
-
-                    <img src="/logo_fede.png" alt="Logo FEDE" class="h-15 w-auto object-contain opacity-95" />
-
-                </div>
-
-
-                <div class="ml-auto flex items-center gap-4">
-
-                    <div class="hidden text-right sm:block">
-
-                        <p class="text-sm font-bold leading-tight">
-                            {{ fullName }}
-                        </p>
-
-                        <p class="text-xs leading-tight
-                                   text-[#878787]">
-                            {{ user?.sector?.name }}
-                        </p>
-
-                    </div>
-
-
-
-                    <button
-                        type="button"
-                        @click="emit('back')"
-                        title="Regresar al panel de módulos"
-                        aria-label="Regresar al panel de módulos"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dadada] text-[#878787] transition hover:border-[#575756] hover:text-[#575756]"
-                    >
-                        <ArrowLeft :size="17" />
-                    </button>
-
-                    <button @click="logout()" title="Cerrar sesión" class="inline-flex h-9 w-9
-                               items-center justify-center
-                               rounded-lg border border-[#dadada]
-                               text-[#878787]
-                               transition
-                               hover:border-[#575756]
-                               hover:text-[#575756]">
-
-                        <LogOut :size="16" />
-
-                    </button>
-
-                </div>
-
-            </div>
-
-        </header>
+        <InstitutionalHeader
+            :show-back="true"
+            :show-logout="true"
+            module-label="Módulo 1"
+            :participant-name="fullName"
+            :sector="user?.sector?.name"
+            @back="emit('back')"
+            @logout="logout()"
+        />
 
 
         <!-- =====================================================
@@ -1902,165 +1908,7 @@ onUnmounted(() => {
                  RESULT
             ==================================================== -->
 
-            <section v-else class="mx-auto max-w-3xl">
-
-                <div class="overflow-hidden
-                           rounded-[32px]
-                           border border-[#dadada]
-                           bg-white
-                           text-center
-                           shadow-xl
-                           shadow-black/5">
-
-                    <div class="bg-[#575756]
-                               px-6 py-14
-                               text-white">
-
-                        <div class="mx-auto flex
-                                   h-16 w-16
-                                   items-center
-                                   justify-center
-                                   rounded-2xl
-                                   bg-white/10">
-
-                            <ClipboardCheck :size="34" />
-
-                        </div>
-
-
-                        <p class="mt-5
-                                   text-xs
-                                   font-bold
-                                   uppercase
-                                   tracking-[.25em]
-                                   text-white/70">
-                            Finalización
-                        </p>
-
-
-                        <h2 class="mt-2
-                                   text-3xl
-                                   font-black
-                                   md:text-4xl">
-                            ¡Evaluación finalizada!
-                        </h2>
-
-                    </div>
-
-
-                    <div class="p-8 md:p-10">
-
-                        <p class="text-lg
-                                   font-bold
-                                   text-[#575756]">
-                            {{
-                                fullName ||
-                                'Participante registrado'
-                            }}
-                        </p>
-
-
-                        <div class="mx-auto mt-6
-                                   grid max-w-md
-                                   grid-cols-3 gap-3">
-
-                            <div class="rounded-2xl
-                                       border
-                                       border-[#dadada]
-                                       p-4">
-
-                                <p class="text-2xl
-                                           font-black
-                                           text-[#575756]">
-                                    {{ result.score }}/10
-                                </p>
-
-                                <p class="mt-1
-                                           text-xs
-                                           text-[#878787]">
-                                    Calificación
-                                </p>
-
-                            </div>
-
-
-                            <div class="rounded-2xl
-                                       border
-                                       border-[#dadada]
-                                       p-4">
-
-                                <p class="text-2xl
-                                           font-black
-                                           text-[#575756]">
-                                    {{ result.correct }}
-                                </p>
-
-                                <p class="mt-1
-                                           text-xs
-                                           text-[#878787]">
-                                    Correctas
-                                </p>
-
-                            </div>
-
-
-                            <div class="rounded-2xl
-                                       border
-                                       border-[#dadada]
-                                       p-4">
-
-                                <p class="text-2xl
-                                           font-black
-                                           text-[#575756]">
-                                    {{ result.total }}
-                                </p>
-
-                                <p class="mt-1
-                                           text-xs
-                                           text-[#878787]">
-                                    Preguntas
-                                </p>
-
-                            </div>
-
-                        </div>
-
-
-                        <p class="mt-6
-                                   text-base
-                                   leading-7
-                                   text-[#878787]">
-
-                            Gracias por completar el módulo de
-                            capacitación. Tu participación ha sido
-                            registrada de forma exitosa en la
-                            plataforma institucional.
-
-                        </p>
-
-
-                        <button @click="restart" class="mt-8 inline-flex
-                                   items-center
-                                   gap-2
-                                   rounded-xl
-                                   bg-[#575756]
-                                   px-5 py-3
-                                   text-sm
-                                   font-bold
-                                   text-white
-                                   hover:bg-[#454544]">
-
-                            <RotateCcw :size="17" />
-
-                            Nueva evaluación
-
-                        </button>
-
-                    </div>
-
-                </div>
-
-            </section>
+            <EvaluationResult v-else module-id="1" module-name="Nociones básicas de derecho electoral" :score="result.score" :correct="result.correct" :total="result.total" :attempt="result.attempt" :attempts-remaining="result.attemptsRemaining" :message="message" @retry="restart" @back="emit('back')" @certificate="openCertificate" />
 
         </main>
 

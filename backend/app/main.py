@@ -87,6 +87,17 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(
 )
 
 
+def score_percentage(value: int | None) -> int | None:
+    """Normaliza calificaciones históricas de escala 0–10 a 0–100."""
+    if value is None:
+        return None
+    score = int(value)
+    return score * 10 if 0 <= score <= 10 else score
+
+
+PASSING_SCORE = 70
+
+
 # ============================================================
 # DATABASE
 # ============================================================
@@ -1877,11 +1888,32 @@ async def validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ):
+    labels = {
+        "email": "correo electrónico",
+        "password": "contraseña",
+        "curp": "CURP",
+        "first_name": "nombre",
+        "paternal_surname": "apellido paterno",
+        "maternal_surname": "apellido materno",
+        "question_id": "pregunta",
+        "option_id": "respuesta",
+        "module_id": "módulo",
+    }
+    messages = []
+    for error in exc.errors():
+        field = labels.get(str(error.get("loc", ["dato"])[-1]), "dato")
+        kind = error.get("type", "")
+        if kind in {"missing", "value_error.missing"}:
+            messages.append(f"El campo {field} es obligatorio.")
+        elif kind == "value_error.email":
+            messages.append("Ingresa un correo electrónico válido.")
+        elif kind in {"string_too_short", "string_too_long", "greater_than_equal", "less_than_equal"}:
+            messages.append(f"Revisa la longitud o el valor del campo {field}.")
+        else:
+            messages.append(f"El campo {field} tiene un formato o valor no válido.")
     return JSONResponse(
         status_code=422,
-        content={
-            "detail": exc.errors(),
-        },
+        content={"detail": " ".join(dict.fromkeys(messages)) or "Revisa los datos enviados e inténtalo de nuevo."},
     )
 
 
@@ -2581,8 +2613,15 @@ def get_modules_status(
                 Certificate.module_id == module_id,
             )
         )
+        in_progress = db.scalar(
+            select(Evaluation.id).where(
+                Evaluation.user_id == current_user.id,
+                Evaluation.module_id == module_id,
+                Evaluation.completed_at.is_(None),
+            ).limit(1)
+        ) is not None
         best_score = max(
-            (int(item.score) for item in completed if item.score is not None),
+            (score_percentage(item.score) for item in completed if item.score is not None),
             default=None,
         )
         result.append({
@@ -2591,7 +2630,8 @@ def get_modules_status(
             "attempts": len(completed),
             "attempts_remaining": max(0, 3 - len(completed)),
             "best_score": best_score,
-            "passed": best_score is not None and best_score >= 7,
+            "passed": best_score is not None and best_score >= PASSING_SCORE,
+            "in_progress": in_progress,
             "questions_available": module_id != 2 and db.scalar(
                 select(text("COUNT(*)")).select_from(Question).where(
                     Question.module_id == module_id
@@ -2638,7 +2678,7 @@ def get_certificate(
         "user_name": current_user.full_name,
         "module_id": module_id,
         "module_name": module_names[module_id],
-        "score": certificate.score,
+        "score": score_percentage(certificate.score),
         "issued_at": certificate.issued_at,
     }
 
@@ -2675,9 +2715,42 @@ def get_current_evaluation(
     )
 
     if not evaluation:
+        evaluation = db.scalar(
+            select(Evaluation)
+            .where(
+                Evaluation.user_id == current_user.id,
+                Evaluation.module_id == module_id,
+                Evaluation.completed_at.is_not(None),
+            )
+            .order_by(Evaluation.completed_at.desc())
+        )
+        if not evaluation:
+            return {"has_evaluation": False, "evaluation": None}
         return {
-            "has_evaluation": False,
-            "evaluation": None,
+            "has_evaluation": True,
+            "evaluation": {
+                "id": evaluation.id,
+                "completed": True,
+                "video_completed": evaluation.video_completed,
+                "started_at": evaluation.started_at,
+                "completed_at": evaluation.completed_at,
+                "current_question": evaluation.current_question,
+                "question_order": [],
+                "answered_count": evaluation.correct_answers,
+                "total_questions": evaluation.total_questions,
+                "score": score_percentage(evaluation.score),
+                "correct": evaluation.correct_answers,
+                "attempt_number": evaluation.attempt_number,
+                "attempts_remaining": max(0, 3 - int(db.scalar(
+                    select(text("COUNT(*)")).select_from(Evaluation).where(
+                        Evaluation.user_id == current_user.id,
+                        Evaluation.module_id == module_id,
+                        Evaluation.completed_at.is_not(None),
+                    )
+                ) or 0)),
+                "passed": (score_percentage(evaluation.score) or 0) >= PASSING_SCORE,
+                "answers": [],
+            },
         }
 
     had_question_order = bool(evaluation.question_order)
@@ -2712,6 +2785,7 @@ def get_current_evaluation(
         "has_evaluation": True,
         "evaluation": {
             "id": evaluation.id,
+            "completed": False,
             "video_completed":
                 evaluation.video_completed,
             "started_at":
@@ -2873,16 +2947,19 @@ def start_evaluation(
     )
     completed_attempts = int(completed_attempts or 0)
 
-    best_score = db.scalar(
+    previous_scores = db.scalars(
         select(Evaluation.score)
         .where(
             Evaluation.user_id == current_user.id,
             Evaluation.module_id == module_id,
             Evaluation.completed_at.is_not(None),
         )
-        .order_by(Evaluation.score.desc())
+    ).all()
+    best_score = max(
+        (score_percentage(score) or 0 for score in previous_scores),
+        default=None,
     )
-    if best_score is not None and int(best_score) >= 7:
+    if best_score is not None and best_score >= PASSING_SCORE:
         raise HTTPException(
             status_code=409,
             detail="Este módulo ya fue aprobado.",
@@ -3344,7 +3421,7 @@ def finish_evaluation(
         if answer.is_correct
     )
 
-    score = round((correct / total) * 10)
+    score = round((correct / total) * 100)
 
     # --------------------------------------------------------
     # GUARDAR RESULTADO
@@ -3361,7 +3438,7 @@ def finish_evaluation(
     )
 
     certificate_id = None
-    if score >= 7:
+    if score >= PASSING_SCORE:
         existing_certificate = db.scalar(
             select(Certificate).where(
                 Certificate.user_id == current_user.id,
@@ -3407,7 +3484,7 @@ def finish_evaluation(
         "attempt_number":
             evaluation.attempt_number,
         "passed":
-            score >= 7,
+            score >= PASSING_SCORE,
         "certificate_id":
             certificate_id,
     }
