@@ -21,7 +21,8 @@ import {
   Accessibility,
   UsersRound,
 } from 'lucide-vue-next';
-import { useAuth, type Institution } from '../lib/auth';
+import { useAuth, type Institution } from '../../services/auth';
+import BaseAlert from '../../components/ui/BaseAlert.vue';
 
 type CatalogItem = {
   id: number;
@@ -438,7 +439,7 @@ async function onSubmit() {
 </script>
 
 <template>
-  <main class="relative min-h-screen overflow-hidden bg-[#f6f6f5] text-[#292928]">
+  <div class="relative min-h-screen overflow-hidden bg-[#f6f6f5] text-[#292928]">
     <!-- Background -->
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
       <div
@@ -493,6 +494,8 @@ async function onSubmit() {
 
     <!-- Content -->
     <main
+      id="main-content"
+      tabindex="-1"
       class="relative z-10 mx-auto flex w-full max-w-4xl justify-center px-5 py-10 sm:px-8 lg:py-14"
     >
       <div class="w-full">
@@ -747,13 +750,9 @@ async function onSubmit() {
                 Cargando catálogos...
               </div>
 
-              <div
-                v-if="catalogError"
-                class="mb-6 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3.5 text-sm text-amber-800"
-              >
-                <AlertCircle :size="17" class="mt-0.5 shrink-0" />
-                <span class="leading-5">{{ catalogError }}</span>
-              </div>
+              <BaseAlert v-if="catalogError" class="mb-6" variant="destructive" title="No se pudieron cargar los datos de registro" :description="catalogError">
+                <template #action><button type="button" class="min-h-10 rounded-lg border border-[#a3a3a2] bg-white px-3 py-2 text-sm font-semibold hover:bg-[#f2f2f1]" @click="loadCatalogs">Reintentar</button></template>
+              </BaseAlert>
 
               <div class="space-y-5">
                 <!-- Institution + CURP -->
@@ -1213,15 +1212,7 @@ async function onSubmit() {
 
             <!-- Error -->
             <Transition name="fade">
-              <div
-                v-if="error"
-                class="mt-8 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3.5 text-sm text-red-700"
-                role="alert"
-                aria-live="assertive"
-              >
-                <AlertCircle :size="17" class="mt-0.5 shrink-0" />
-                <span class="leading-5">{{ error }}</span>
-              </div>
+              <BaseAlert v-if="error" class="mt-8" variant="destructive" title="Revisa los datos del formulario" :description="error" />
             </Transition>
 
             <!-- Submit -->
@@ -1231,10 +1222,6 @@ async function onSubmit() {
                 :disabled="loading || loadingCatalogs"
                 class="group relative flex h-[54px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-[#292928] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(41,41,40,0.16)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1f1f1e] hover:shadow-[0_14px_30px_rgba(41,41,40,0.2)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
               >
-                <span
-                  class="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent transition-transform duration-700 group-hover:translate-x-full"
-                />
-
                 <Loader2
                   v-if="loading"
                   :size="18"
@@ -1304,7 +1291,7 @@ async function onSubmit() {
         </div>
       </div>
     </main>
-  </main>
+  </div>
 </template>
 
 <style scoped>

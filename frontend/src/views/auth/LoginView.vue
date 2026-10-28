@@ -1,4 +1,3 @@
-```vue
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import {
@@ -14,7 +13,10 @@ import {
   UserPlus,
 } from 'lucide-vue-next';
 
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../../services/auth';
+import BaseAlert from '../../components/ui/BaseAlert.vue';
+
+defineProps<{ notice?: string }>();
 
 const emit = defineEmits<{
   (e: 'success'): void;
@@ -77,12 +79,6 @@ async function onSubmit() {
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| Fondo animado
-|--------------------------------------------------------------------------
-*/
-
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 let ctx: CanvasRenderingContext2D | null = null;
@@ -98,28 +94,20 @@ let particles: {
 
 function resizeCanvas() {
   const canvas = canvasRef.value;
-
   if (!canvas) return;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
   canvas.width = canvas.clientWidth * dpr;
   canvas.height = canvas.clientHeight * dpr;
-
   ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
 function initParticles() {
   const canvas = canvasRef.value;
-
   if (!canvas) return;
 
   const area = canvas.clientWidth * canvas.clientHeight;
-
-  const count = Math.min(
-    42,
-    Math.max(16, Math.floor(area / 22000))
-  );
+  const count = Math.min(42, Math.max(16, Math.floor(area / 22000)));
 
   particles = Array.from({ length: count }, () => ({
     x: Math.random() * canvas.clientWidth,
@@ -132,35 +120,21 @@ function initParticles() {
 
 function step() {
   const canvas = canvasRef.value;
-
   if (!canvas || !ctx) return;
-
-  if (
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  ) {
-    return;
-  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
-
   ctx.clearRect(0, 0, width, height);
 
   for (const p of particles) {
     p.x += p.vx;
     p.y += p.vy;
-
-    if (p.x < -10 || p.x > width + 10) {
-      p.vx *= -1;
-    }
-
-    if (p.y < -10 || p.y > height + 10) {
-      p.vy *= -1;
-    }
+    if (p.x < -10 || p.x > width + 10) p.vx *= -1;
+    if (p.y < -10 || p.y > height + 10) p.vy *= -1;
 
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-
     ctx.fillStyle = 'rgba(255,255,255,0.20)';
     ctx.fill();
   }
@@ -169,23 +143,16 @@ function step() {
     for (let j = i + 1; j < particles.length; j++) {
       const a = particles[i];
       const b = particles[j];
-
       const dx = a.x - b.x;
       const dy = a.y - b.y;
-
       const dist = Math.sqrt(dx * dx + dy * dy);
       const maxDist = 110;
 
       if (dist < maxDist) {
         ctx.beginPath();
-
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
-
-        ctx.strokeStyle = `rgba(255,255,255,${
-          0.045 * (1 - dist / maxDist)
-        })`;
-
+        ctx.strokeStyle = `rgba(255,255,255,${0.045 * (1 - dist / maxDist)})`;
         ctx.lineWidth = 0.7;
         ctx.stroke();
       }
@@ -202,15 +169,12 @@ function handleResize() {
 
 onMounted(() => {
   const canvas = canvasRef.value;
-
   if (canvas) {
     ctx = canvas.getContext('2d');
-
     resizeCanvas();
     initParticles();
     step();
   }
-
   window.addEventListener('resize', handleResize);
 });
 
@@ -218,10 +182,13 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(animationFrame);
   window.removeEventListener('resize', handleResize);
 });
+
 </script>
 
 <template>
   <main
+    id="main-content"
+    tabindex="-1"
     class="relative min-h-screen overflow-hidden bg-[#f6f6f5] text-[#292928]"
   >
     <!-- ================================================================
@@ -263,8 +230,6 @@ onBeforeUnmount(() => {
           class="pointer-events-none absolute inset-0 h-full w-full"
           aria-hidden="true"
         />
-
-        <!-- Subtle grid -->
 
         <div
           class="pointer-events-none absolute inset-0 opacity-[0.025]"
@@ -413,6 +378,10 @@ onBeforeUnmount(() => {
               @submit.prevent="onSubmit"
               novalidate
             >
+              <Transition name="fade">
+                <BaseAlert v-if="notice" variant="success" title="Registro completado" :description="notice" />
+              </Transition>
+
               <!-- Email -->
 
               <label class="block">
@@ -426,8 +395,8 @@ onBeforeUnmount(() => {
                   class="group flex h-[52px] items-center gap-3 rounded-2xl border bg-[#fafafa] px-4 transition-all duration-200"
                   :class="
                     error
-                      ? 'border-red-200 bg-red-50/30 focus-within:border-red-400 focus-within:ring-4 focus-within:ring-red-500/5'
-                      : 'border-[#e4e4e3] hover:border-[#cfcfce] focus-within:border-[#4a4a49] focus-within:bg-white focus-within:ring-4 focus-within:ring-black/[0.035]'
+                      ? 'border-[#575756] bg-[#eeeeed]'
+                      : 'border-[#e4e4e3] hover:border-[#cfcfce]'
                   "
                 >
                   <Mail
@@ -446,7 +415,7 @@ onBeforeUnmount(() => {
                     :disabled="loading"
                     :aria-invalid="!!error"
                     aria-describedby="login-error"
-                    class="w-full bg-transparent text-sm font-medium text-[#292928] outline-none placeholder:text-[#b8b8b7] disabled:cursor-not-allowed disabled:opacity-50"
+                    class="login-input w-full appearance-none border-0 bg-transparent p-0 text-sm font-medium text-[#292928] shadow-none outline-none ring-0 placeholder:text-[#b8b8b7] focus:border-0 focus:bg-transparent focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
               </label>
@@ -464,8 +433,8 @@ onBeforeUnmount(() => {
                   class="group flex h-[52px] items-center gap-3 rounded-2xl border bg-[#fafafa] px-4 transition-all duration-200"
                   :class="
                     error
-                      ? 'border-red-200 bg-red-50/30 focus-within:border-red-400 focus-within:ring-4 focus-within:ring-red-500/5'
-                      : 'border-[#e4e4e3] hover:border-[#cfcfce] focus-within:border-[#4a4a49] focus-within:bg-white focus-within:ring-4 focus-within:ring-black/[0.035]'
+                      ? 'border-[#575756] bg-[#eeeeed]'
+                      : 'border-[#e4e4e3] hover:border-[#cfcfce]'
                   "
                 >
                   <Lock
@@ -485,7 +454,7 @@ onBeforeUnmount(() => {
                     aria-describedby="login-error"
                     @keyup="handlePasswordKeydown"
                     @keydown="handlePasswordKeydown"
-                    class="w-full bg-transparent text-sm font-medium tracking-wide text-[#292928] outline-none placeholder:text-[#b8b8b7] disabled:cursor-not-allowed disabled:opacity-50"
+                    class="login-input w-full appearance-none border-0 bg-transparent p-0 text-sm font-medium tracking-wide text-[#292928] shadow-none outline-none ring-0 placeholder:text-[#b8b8b7] focus:border-0 focus:bg-transparent focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
                   />
 
                   <button
@@ -516,7 +485,7 @@ onBeforeUnmount(() => {
                 <Transition name="fade">
                   <p
                     v-if="capsLockOn"
-                    class="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-amber-600"
+                    class="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-[#575756]"
                   >
                     <AlertCircle :size="13" />
                     Bloq Mayús está activado
@@ -527,22 +496,7 @@ onBeforeUnmount(() => {
               <!-- Error -->
 
               <Transition name="fade">
-                <div
-                  v-if="error"
-                  id="login-error"
-                  role="alert"
-                  aria-live="assertive"
-                  class="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3.5 text-sm text-red-700"
-                >
-                  <AlertCircle
-                    :size="17"
-                    class="mt-0.5 shrink-0"
-                  />
-
-                  <span class="leading-5">
-                    {{ error }}
-                  </span>
-                </div>
+                <BaseAlert v-if="error" id="login-error" variant="destructive" title="No se pudo iniciar sesión" :description="error" />
               </Transition>
 
               <!-- Submit -->
@@ -552,10 +506,6 @@ onBeforeUnmount(() => {
                 :disabled="loading"
                 class="group relative flex h-[54px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-[#292928] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(41,41,40,0.16)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1f1f1e] hover:shadow-[0_14px_30px_rgba(41,41,40,0.2)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
               >
-                <span
-                  class="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent transition-transform duration-700 group-hover:translate-x-full"
-                />
-
                 <Loader2
                   v-if="loading"
                   :size="18"
@@ -645,6 +595,28 @@ onBeforeUnmount(() => {
   }
 }
 
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #292928;
+  caret-color: #292928;
+  box-shadow: 0 0 0 1000px transparent inset;
+  transition: background-color 9999s ease-out 0s;
+}
+
+.login-input,
+.login-input:focus,
+.login-input:focus-visible,
+.login-input:active {
+  appearance: none !important;
+  border: 0 !important;
+  border-width: 0 !important;
+  outline: 0 !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
 .animate-login {
   animation: login-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -673,4 +645,3 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-

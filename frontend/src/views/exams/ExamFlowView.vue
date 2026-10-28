@@ -18,10 +18,12 @@ import {
     ArrowLeft,
 } from 'lucide-vue-next';
 
-import { useAuth } from '../lib/auth';
-import EvaluationResult from './EvaluationResult.vue';
-import { openCertificateWindow, renderCertificateDraft } from '../lib/certificate';
-import InstitutionalHeader from './InstitutionalHeader.vue';
+import { useAuth } from '../../services/auth';
+import EvaluationResult from '../../components/exam/EvaluationResult.vue';
+import { openCertificateWindow, renderCertificateDraft } from '../../services/certificate';
+import InstitutionalHeader from '../../components/layout/InstitutionalHeader.vue';
+import BaseAlert from '../../components/ui/BaseAlert.vue';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue';
 
 const emit = defineEmits<{
     (e: 'back'): void;
@@ -207,6 +209,7 @@ const loading = ref(false);
 const savingAnswer = ref(false);
 
 const message = ref('');
+const showFinishConfirmation = ref(false);
 
 const result = ref<Result>({
     score: 0,
@@ -397,6 +400,9 @@ async function loadQuestions() {
         );
 
         questions.value = [];
+        message.value = error instanceof Error
+            ? error.message
+            : 'No se pudieron cargar las preguntas. Intenta recargar el módulo.';
     }
 }
 
@@ -712,6 +718,9 @@ async function restoreEvaluation() {
             'Error recuperando evaluación:',
             error
         );
+        message.value = error instanceof Error
+            ? error.message
+            : 'No se pudo recuperar el avance de tu evaluación. Intenta recargar el módulo.';
 
     }
 }
@@ -882,6 +891,8 @@ async function selectOption(
     const previousOptionId =
         answers.value[questionId];
 
+    message.value = '';
+
     answers.value[
         questionId
     ] = optionId;
@@ -927,10 +938,9 @@ async function selectOption(
 
     } catch (error) {
 
-        console.error(
-            'Error guardando respuesta:',
-            error
-        );
+        message.value = error instanceof Error
+            ? error.message
+            : 'No se pudo guardar tu respuesta. Verifica tu conexión e inténtalo de nuevo.';
 
         if (previousOptionId == null) {
             delete answers.value[questionId];
@@ -980,9 +990,7 @@ async function saveCurrentProgress(
 
         if (!response.ok) {
 
-            console.error(
-                'No se pudo guardar la posición.'
-            );
+            message.value = 'No se pudo guardar tu avance. Comprueba tu conexión e inténtalo de nuevo.';
 
         }
 
@@ -992,6 +1000,9 @@ async function saveCurrentProgress(
             'Error guardando posición:',
             error
         );
+        message.value = error instanceof Error
+            ? error.message
+            : 'No se pudo guardar tu avance. Comprueba tu conexión e inténtalo de nuevo.';
 
     }
 }
@@ -1044,7 +1055,7 @@ async function goToQuestion(index: number) {
    FINISH
    ========================================================= */
 
-async function finish() {
+function finish() {
 
     if (
         !evaluationId.value ||
@@ -1055,9 +1066,12 @@ async function finish() {
         return;
     }
 
-    if (!window.confirm('Al finalizar, tus respuestas quedarán registradas y no podrás modificarlas. ¿Deseas continuar?')) {
-        return;
-    }
+    showFinishConfirmation.value = true;
+}
+
+async function finishConfirmed() {
+    showFinishConfirmation.value = false;
+    if (!evaluationId.value || !allAnswered.value || loading.value || savingAnswer.value) return;
 
     loading.value = true;
 
@@ -1315,9 +1329,7 @@ onUnmounted(() => {
                                            justify-between
                                            border-b
                                            border-[#dadada]
-                                           bg-gradient-to-br
-                                           from-[#575756]
-                                           to-[#3f3f3e]
+                                           bg-[#3f3f3e]
                                            px-4 py-3.5
                                            text-white">
 
@@ -1481,8 +1493,10 @@ onUnmounted(() => {
              MAIN
         ====================================================== -->
 
-        <main class="mx-auto max-w-6xl
+        <main id="main-content" tabindex="-1" class="mx-auto max-w-6xl
                    px-5 py-8 md:py-6">
+
+            <BaseAlert v-if="message && stage !== 'result'" floating variant="destructive" title="No se pudo guardar o completar la acción" :description="message" />
 
             <!-- ===================================================
                  INTRO
@@ -1668,7 +1682,7 @@ onUnmounted(() => {
                             <div class="mt-6 flex w-full max-w-6xl flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 sm:flex-row">
                                 <p class="text-sm text-white/60">
                                     <span v-if="!videoDone">La evaluación se habilita al terminar el video.</span>
-                                    <span v-else class="font-bold text-emerald-300">Video completado. Ya puedes continuar.</span>
+                                    <span v-else class="font-bold text-white">Video completado. Ya puedes continuar.</span>
                                 </p>
 
                                 <button
@@ -1697,8 +1711,7 @@ onUnmounted(() => {
 
                 <!-- HEADER -->
 
-                <div class="mb-5 flex items-center
-                           justify-between">
+                <div class="mb-5 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
 
                     <div>
 
@@ -1710,7 +1723,7 @@ onUnmounted(() => {
                             Módulo 1
                         </p>
 
-                        <h2 class="text-xl font-black">
+                        <h2 class="max-w-2xl text-lg font-black leading-snug text-[#575756] md:text-xl">
                             Nociones básicas de derecho electoral
                         </h2>
 
@@ -1726,7 +1739,7 @@ onUnmounted(() => {
                         </p>
 
                         <p class="text-xs text-[#878787]">
-                            {{ answeredCount }} contestadas
+                            Preguntas contestadas: {{ answeredCount }}
                         </p>
 
                     </div>
@@ -1753,7 +1766,7 @@ onUnmounted(() => {
 
                 <!-- QUESTION CARD -->
 
-                <div v-if="q" class="mt-8 rounded-3xl
+                <div v-if="q" class="mt-8 h-[min(640px,60vh)] min-h-[480px] overflow-y-auto rounded-3xl
                            border border-[#dadada]
                            bg-white p-6
                            shadow-xl
@@ -1782,10 +1795,7 @@ onUnmounted(() => {
                                 </span>
 
 
-                                <h3 class="text-xl
-                                           font-bold
-                                           leading-8
-                                           md:text-2xl">
+                                <h3 class="text-lg font-bold leading-7 md:text-xl md:leading-8">
                                     {{ q.text }}
                                 </h3>
 
@@ -1796,14 +1806,9 @@ onUnmounted(() => {
 
                             <div class="mt-8 space-y-3">
 
-                                <button v-for="o in q.options" :key="o.id" @click="
+                                <button v-for="o in q.options" :key="o.id" type="button" :disabled="savingAnswer" @click="
                                     selectOption(o.id)
-                                    " class="group flex w-full
-                                           items-start gap-4
-                                           rounded-2xl
-                                           border p-4
-                                           text-left
-                                           transition" :class="answers[q.id] === o.id
+                                    " class="group flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition disabled:opacity-60" :class="answers[q.id] === o.id
                                                 ? 'border-[#575756] bg-[#f0f0ef] shadow-sm'
                                                 : 'border-[#dadada] hover:border-[#878787] hover:bg-[#fafafa]'
                                             ">
@@ -1831,11 +1836,7 @@ onUnmounted(() => {
                                     </span>
 
 
-                                    <CheckCircle2 v-if="
-                                        answers[q.id] === o.id
-                                    " class="ml-auto
-                                               mt-1
-                                               shrink-0" :size="20" />
+                                    <CheckCircle2 v-if="answers[q.id] === o.id" aria-label="Opción seleccionada" class="ml-auto mt-1 shrink-0 text-green-700" :size="18" />
 
                                 </button>
 
@@ -1844,21 +1845,8 @@ onUnmounted(() => {
 
                             <!-- SAVE STATUS -->
 
-                            <div class="mt-4
-                                       text-right
-                                       text-xs
-                                       text-[#878787]">
-
-                                <span v-if="savingAnswer">
-                                    Guardando respuesta…
-                                </span>
-
-                                <span v-else-if="
-                                    answers[q.id]
-                                " class="font-semibold">
-                                    Respuesta guardada
-                                </span>
-
+                            <div class="mt-4 flex justify-end">
+                                <span v-if="savingAnswer" role="status" aria-live="polite" class="text-xs font-medium text-[#575756]">Guardando respuesta…</span>
                             </div>
 
                         </div>
@@ -1881,14 +1869,15 @@ onUnmounted(() => {
                         <button v-for="(item, index) in questions" :key="item.id" type="button" @click="goToQuestion(index)" :disabled="index > maxReachableIndex || savingAnswer" :aria-label="`Pregunta ${index + 1}${answers[item.id] ? ', respondida' : ', pendiente'}`" :aria-current="index === current ? 'page' : undefined" :title="`Pregunta ${index + 1}`" class="h-9 w-9 rounded-lg border text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-35" :class="index === current
                             ? 'border-[#575756] bg-[#575756] text-white'
                             : answers[item.id]
-                                ? 'border-[#4f7b63] bg-[#e8f0eb] text-[#315a43] hover:bg-[#dce9e0]'
+                                ? 'border-[#a3a3a2] bg-[#eeeeed] text-[#292928] hover:bg-[#e5e5e4]'
                                 : 'border-[#dadada] bg-white text-[#878787] hover:border-[#878787]'">
                             {{ index + 1 }}
                         </button>
 
                     </div>
 
-                    <button v-if="canNext" type="button" @click="next" :disabled="savingAnswer" aria-label="Pregunta siguiente" title="Pregunta siguiente" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#dadada] bg-white text-[#575756] disabled:opacity-35">
+                    <button v-if="canNext" type="button" @click="next" :disabled="savingAnswer" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#575756] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#454544] disabled:cursor-not-allowed disabled:opacity-50">
+                        Siguiente pregunta
                         <ChevronRight :size="18" />
                     </button>
 
@@ -1911,6 +1900,16 @@ onUnmounted(() => {
             <EvaluationResult v-else module-id="1" module-name="Nociones básicas de derecho electoral" :score="result.score" :correct="result.correct" :total="result.total" :attempt="result.attempt" :attempts-remaining="result.attemptsRemaining" :message="message" @retry="restart" @back="emit('back')" @certificate="openCertificate" />
 
         </main>
+
+        <ConfirmDialog
+            v-if="showFinishConfirmation"
+            title="¿Finalizar evaluación?"
+            description="Al finalizar, tus respuestas quedarán registradas y ya no podrás modificarlas. Revisa que todas estén contestadas antes de continuar."
+            confirm-label="Finalizar evaluación"
+            :busy="loading"
+            @cancel="showFinishConfirmation = false"
+            @confirm="finishConfirmed"
+        />
 
 
         <!-- =====================================================

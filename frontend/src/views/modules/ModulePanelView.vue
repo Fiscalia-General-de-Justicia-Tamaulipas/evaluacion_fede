@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { BookOpen, CheckCircle2, LockKeyhole } from 'lucide-vue-next';
-import { useAuth } from '../lib/auth';
-import InstitutionalHeader from './InstitutionalHeader.vue';
+import { useAuth } from '../../services/auth';
+import InstitutionalHeader from '../../components/layout/InstitutionalHeader.vue';
+import BaseAlert from '../../components/ui/BaseAlert.vue';
 
 type ModuleStatus = {
   module_id: number;
@@ -63,19 +64,20 @@ onMounted(loadStatus);
       <h1 class="mt-2 text-3xl font-black md:text-4xl">Bienvenido, {{ fullName }}</h1>
       <p class="mt-3 max-w-2xl text-sm leading-6 text-[#878787]">Selecciona un módulo para continuar tu capacitación. Acreditas con una calificación mínima de 70/100.</p>
 
-      <div v-if="error" role="alert" class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-900">
-        <span>{{ error }}</span>
-        <button type="button" class="rounded-lg border border-red-300 px-3 py-2 hover:bg-red-100" @click="loadStatus">Reintentar</button>
-      </div>
+      <BaseAlert v-if="error" class="mt-6" variant="destructive" title="No se pudieron cargar tus módulos" :description="error">
+        <template #action><button type="button" class="min-h-10 rounded-lg border border-[#a3a3a2] bg-white px-3 py-2 text-sm font-semibold hover:bg-[#f2f2f1]" @click="loadStatus">Reintentar</button></template>
+      </BaseAlert>
 
       <div class="mt-8 grid gap-5 md:grid-cols-3">
-        <div v-if="loading" v-for="moduleId in [1, 2, 3]" :key="moduleId" class="h-64 animate-pulse rounded-2xl border border-[#dadada] bg-white" />
+        <template v-if="loading">
+          <div v-for="moduleId in [1, 2, 3]" :key="moduleId" aria-hidden="true" class="h-[320px] animate-pulse rounded-2xl border border-[#dadada] bg-white" />
+        </template>
         <div v-if="!loading && !error && !modules.length" class="rounded-2xl border border-[#dadada] bg-white p-8 text-sm text-[#575756]">No hay módulos disponibles en este momento. Intenta recargar el estado.</div>
         <button
           v-for="module in modules"
           :key="module.module_id"
           type="button"
-          class="module-card group h-[320px] text-left"
+          class="module-card group h-[320px] w-full text-left"
           :disabled="loading"
           @click="emit('select-module', module.module_id)"
         >

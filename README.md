@@ -30,19 +30,9 @@ Abrir `http://localhost:5173`.
 
 API: `http://localhost:8000/docs`
 
-## Video real
-Reemplaza `frontend/public/demo.mp4` por el video institucional real, conservando ese nombre, o modifica el `source` en `frontend/src/App.vue`.
+## Frontend
 
-## Funcionalidad
-- Video introductorio obligatorio.
-- Botón de evaluación bloqueado hasta `ended`.
-- Captura de nombre completo.
-- Examen tipo slides, una pregunta por pantalla.
-- Regreso a preguntas anteriores y modificación de respuestas.
-- Indicador de progreso y mapa de preguntas.
-- Persistencia de evaluación y respuestas en MySQL.
-- Calificación automática.
-- Registro de inicio/finalización.
+La documentación de estructura, diseño, flujos, ejecución y pruebas del cliente está en [`frontend/README.md`](frontend/README.md). Los videos por módulo están en `frontend/public/curso-modulo1.mp4`, `curso-modulo2.mp4` y `curso-modulo3.mp4`.
 
 ## Producción
 Para producción conviene servir el frontend compilado detrás de Nginx y limitar CORS al dominio institucional. También se recomienda agregar autenticación administrativa, catálogo de cursos/módulos y un panel de resultados.

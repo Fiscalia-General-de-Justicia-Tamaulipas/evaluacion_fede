@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Award, ArrowLeft, BadgeCheck, FileText, RotateCcw } from 'lucide-vue-next';
+import BaseAlert from '../ui/BaseAlert.vue';
 
 withDefaults(defineProps<{
   moduleId: number;
@@ -25,7 +26,7 @@ const emit = defineEmits<{
       <div class="h-1.5 bg-[#575756]" />
       <div class="px-6 py-8 sm:px-10 sm:py-10">
         <div class="flex flex-col gap-6 sm:flex-row sm:items-start">
-          <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl" :class="score >= 70 ? 'bg-[#eeeeed] text-[#292928]' : 'bg-amber-50 text-amber-800'">
+          <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#d2d2d1] bg-[#f5f5f4] text-[#292928]">
             <BadgeCheck v-if="score >= 70" :size="30" stroke-width="1.8" />
             <Award v-else :size="30" stroke-width="1.8" />
           </div>
@@ -36,8 +37,8 @@ const emit = defineEmits<{
             </h1>
             <p class="mt-2 max-w-2xl text-sm leading-6 text-[#575756]">{{ moduleName }}</p>
           </div>
-          <span class="inline-flex shrink-0 items-center gap-2 self-start rounded-full border px-3 py-1.5 text-xs font-bold" :class="score >= 70 ? 'border-[#b8c5bf] bg-[#f2f5f3] text-[#29483c]' : 'border-amber-300 bg-amber-50 text-amber-950'">
-            <span class="h-1.5 w-1.5 rounded-full" :class="score >= 70 ? 'bg-[#356b59]' : 'bg-amber-600'" />
+          <span class="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-[#c7c7c6] bg-[#f5f5f4] px-3 py-1.5 text-xs font-bold text-[#292928]">
+            <span class="h-1.5 w-1.5 rounded-full bg-[#575756]" />
             {{ score >= 70 ? 'Acreditado' : 'No acreditado' }}
           </span>
         </div>
@@ -57,11 +58,11 @@ const emit = defineEmits<{
           </div>
         </dl>
 
-        <p v-if="score < 70" class="mt-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+        <BaseAlert v-if="score < 70" class="mt-5" variant="warning" title="Evaluación no acreditada">
           <template v-if="attemptsRemaining">No alcanzaste la calificación mínima de 70. Puedes volver a revisar el video y realizar otro intento.</template>
           <template v-else>No alcanzaste la calificación mínima de 70 y agotaste tus tres intentos. Contacta al área de capacitación para recibir orientación.</template>
-        </p>
-        <p v-if="message" role="alert" class="mt-5 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-900">{{ message }}</p>
+        </BaseAlert>
+        <BaseAlert v-if="message" class="mt-5" variant="destructive" title="No se pudo mostrar la constancia" :description="message" />
 
         <div class="mt-8 flex flex-col-reverse gap-3 border-t border-[#e5e5e5] pt-6 sm:flex-row sm:justify-end">
           <button type="button" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#c7c7c6] bg-white px-4 py-2.5 text-sm font-semibold text-[#292928] transition-colors duration-200 hover:bg-[#f3f3f2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#575756]" @click="emit('back')">

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { ArrowLeft, CheckCircle2, LockKeyhole, PlayCircle, X } from 'lucide-vue-next';
-import { useAuth } from '../lib/auth';
-import EvaluationResult from './EvaluationResult.vue';
-import { openCertificateWindow, renderCertificateDraft } from '../lib/certificate';
-import InstitutionalHeader from './InstitutionalHeader.vue';
+import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, LockKeyhole, PlayCircle, X } from 'lucide-vue-next';
+import { useAuth } from '../../services/auth';
+import EvaluationResult from '../../components/exam/EvaluationResult.vue';
+import { openCertificateWindow, renderCertificateDraft } from '../../services/certificate';
+import InstitutionalHeader from '../../components/layout/InstitutionalHeader.vue';
+import BaseAlert from '../../components/ui/BaseAlert.vue';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue';
 
 const props = defineProps<{ moduleId: number }>();
 const emit = defineEmits<{ (e: 'back'): void }>();
@@ -34,6 +36,7 @@ const videoDone = ref(false);
 const loading = ref(false);
 const savingAnswer = ref(false);
 const message = ref('');
+const showFinishConfirmation = ref(false);
 const videoModalOpen = ref(false);
 const modalVideoRef = ref<HTMLVideoElement | null>(null);
 const result = ref({ score: 0, correct: 0, total: 0, passed: false, attempt: 1, certificateId: null as number | null });
@@ -41,6 +44,12 @@ const result = ref({ score: 0, correct: 0, total: 0, passed: false, attempt: 1, 
 const q = computed(() => questions.value[current.value]);
 const allAnswered = computed(() => questions.value.length > 0 && questions.value.every(question => answers.value[question.id] != null));
 const progress = computed(() => questions.value.length ? (Object.keys(answers.value).length / questions.value.length) * 100 : 0);
+const answeredCount = computed(() => Object.keys(answers.value).length);
+const maxReachableIndex = computed(() => {
+  const nextUnanswered = questions.value.findIndex(question => answers.value[question.id] == null);
+  return nextUnanswered === -1 ? Math.max(questions.value.length - 1, 0) : nextUnanswered;
+});
+const canNext = computed(() => !!q.value && answers.value[q.value.id] != null && current.value < maxReachableIndex.value);
 
 function openVideoModal() {
   videoModalOpen.value = true;
@@ -93,7 +102,15 @@ async function restore() {
   videoDone.value = data.evaluation.video_completed;
   for (const answer of data.evaluation.answers ?? []) answers.value[answer.question_id] = answer.option_id;
   applyOrder(data.evaluation.question_order ?? []);
-  if (videoDone.value) stage.value = 'exam';
+  if (videoDone.value) {
+    stage.value = 'exam';
+    if (questions.value.length > 0) {
+      current.value = Math.min(
+        Math.max(data.evaluation.current_question ?? 0, 0),
+        questions.value.length - 1,
+      );
+    }
+  }
   } catch (error: any) {
     message.value = error?.message || 'No se pudo cargar el módulo. Inténtalo nuevamente.';
   }
@@ -124,6 +141,12 @@ async function applyStart(data: any) {
   evaluationId.value = data.evaluation_id;
   for (const answer of data.answers ?? []) answers.value[answer.question_id] = answer.option_id;
   applyOrder(data.question_order ?? []);
+  if (questions.value.length > 0) {
+    current.value = Math.min(
+      Math.max(data.current_question ?? 0, 0),
+      questions.value.length - 1,
+    );
+  }
   if (!data.video_completed) {
     const response = await apiFetch(`/api/evaluations/${evaluationId.value}/video-completed`, { method: 'POST' });
     if (!response.ok) {
@@ -161,9 +184,51 @@ async function selectOption(optionId: number) {
   }
 }
 
+async function saveCurrentProgress(position = current.value) {
+  if (!evaluationId.value) return;
+  try {
+    const response = await apiFetch(`/api/evaluations/${evaluationId.value}/progress`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_question: position }),
+    });
+    if (!response.ok) message.value = 'No se pudo guardar tu avance. Comprueba tu conexión e inténtalo de nuevo.';
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : 'No se pudo guardar tu avance.';
+  }
+}
+
+async function previous() {
+  if (current.value <= 0) return;
+  current.value--;
+  await saveCurrentProgress();
+}
+
+async function next() {
+  if (!canNext.value) return;
+  current.value++;
+  await saveCurrentProgress();
+}
+
+async function goToQuestion(index: number) {
+  if (
+    index < 0 ||
+    index > maxReachableIndex.value ||
+    index >= questions.value.length ||
+    index === current.value
+  ) return;
+  current.value = index;
+  await saveCurrentProgress();
+}
+
 async function finish() {
   if (!allAnswered.value || !evaluationId.value || loading.value) return;
-  if (!window.confirm('Al finalizar, tus respuestas quedarán registradas y no podrás modificarlas. ¿Deseas continuar?')) return;
+  showFinishConfirmation.value = true;
+}
+
+async function finishConfirmed() {
+  showFinishConfirmation.value = false;
+  if (!allAnswered.value || !evaluationId.value || loading.value) return;
   loading.value = true;
   try {
     const response = await apiFetch(`/api/evaluations/${evaluationId.value}/finish`, {
@@ -238,8 +303,8 @@ onBeforeUnmount(() => {
   <div class="min-h-screen bg-[#f5f5f5] text-[#292928]">
     <InstitutionalHeader :show-back="true" :module-label="`Módulo ${moduleId}`" :participant-name="fullName" @back="emit('back')" />
 
-    <main class="mx-auto max-w-6xl px-5 py-8 md:py-6">
-      <p v-if="message && stage !== 'result'" role="alert" class="mb-5 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-900">{{ message }}</p>
+    <main id="main-content" tabindex="-1" class="mx-auto max-w-6xl px-5 py-8 md:py-6">
+      <BaseAlert v-if="message && stage !== 'result'" floating variant="destructive" title="No se pudo completar la acción" :description="message" />
       <section v-if="stage === 'intro'" class="flex flex-col items-center">
         <div class="mx-auto max-w-4xl text-center">
           <span class="inline-flex items-center gap-2 rounded-full bg-[#dadada]/60 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#575756]">
@@ -320,28 +385,109 @@ onBeforeUnmount(() => {
         </div>
       </Transition>
 
-      <section v-if="stage === 'exam'" class="rounded-3xl border border-[#dadada] bg-white p-6 shadow-sm md:p-10">
-        <div class="flex items-end justify-between">
-          <div><p class="text-xs font-bold uppercase tracking-widest text-[#878787]">Módulo {{ moduleId }}</p><h1 class="mt-2 text-xl font-black">{{ names[moduleId] }}</h1></div>
-          <p class="text-sm font-bold">{{ current + 1 }} / {{ questions.length }}</p>
+      <section v-if="stage === 'exam'" class="mx-auto max-w-4xl">
+        <div class="mb-5 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+          <div class="min-w-0">
+            <p class="text-xs font-bold uppercase tracking-widest text-[#878787]">Módulo {{ moduleId }}</p>
+            <h2 class="max-w-2xl text-lg font-black leading-snug text-[#575756] md:text-xl">{{ names[moduleId] }}</h2>
+          </div>
+          <div class="text-right">
+            <p class="text-sm font-bold">{{ current + 1 }} / {{ questions.length }}</p>
+            <p class="text-xs text-[#878787]">Preguntas contestadas: {{ answeredCount }}</p>
+          </div>
         </div>
-        <div class="mt-5 h-2 overflow-hidden rounded-full bg-[#e5e5e5]"><div class="h-full rounded-full bg-[#575756]" :style="{ width: progress + '%' }" /></div>
-        <article v-if="q" class="mt-8">
-          <h2 class="text-xl font-bold leading-8">{{ q.text }}</h2>
-          <div class="mt-7 space-y-3">
-            <button v-for="option in q.options" :key="option.id" type="button" :disabled="savingAnswer" class="flex w-full items-start gap-4 rounded-xl border p-4 text-left transition hover:border-[#878787] hover:bg-[#fafafa] disabled:opacity-60" :class="answers[q.id] === option.id ? 'border-[#575756] bg-[#f0f0ef]' : 'border-[#dadada]'" @click="selectOption(option.id)">
-              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm font-black" :class="answers[q.id] === option.id ? 'border-[#575756] bg-[#575756] text-white' : 'border-[#dadada] text-[#878787]'">{{ option.letter }}</span>
-              <span class="pt-1 leading-6">{{ option.text }}</span>
-              <CheckCircle2 v-if="answers[q.id] === option.id" :size="20" class="ml-auto mt-1 shrink-0" />
+
+        <div class="h-2 overflow-hidden rounded-full bg-[#dadada]">
+          <div class="h-full rounded-full bg-[#575756] transition-all duration-500" :style="{ width: progress + '%' }" />
+        </div>
+
+        <div v-if="q" class="mt-8 h-[min(640px,64vh)] min-h-[480px] overflow-y-auto rounded-3xl border border-[#dadada] bg-white p-6 shadow-xl shadow-black/5 md:p-10">
+          <Transition name="fade" mode="out-in">
+            <div :key="q.id">
+              <div class="flex items-start gap-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#575756] text-sm font-black text-white">
+                  {{ current + 1 }}
+                </span>
+                <h3 class="text-lg font-bold leading-7 md:text-xl md:leading-8">
+                  {{ q.text }}
+                </h3>
+              </div>
+
+              <div class="mt-8 space-y-3">
+                <button
+                  v-for="option in q.options"
+                  :key="option.id"
+                  type="button"
+                  :disabled="savingAnswer"
+                  class="group flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition disabled:opacity-60"
+                  :class="answers[q.id] === option.id
+                    ? 'border-[#575756] bg-[#f0f0ef] shadow-sm'
+                    : 'border-[#dadada] hover:border-[#878787] hover:bg-[#fafafa]'"
+                  @click="selectOption(option.id)"
+                >
+                  <span
+                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm font-bold"
+                    :class="answers[q.id] === option.id
+                      ? 'border-[#575756] bg-[#575756] text-white'
+                      : 'border-[#dadada] text-[#878787]'"
+                  >
+                    {{ option.letter.toUpperCase() }}
+                  </span>
+                  <span class="pt-1 text-sm leading-6 md:text-base">{{ option.text }}</span>
+                  <CheckCircle2
+                    v-if="answers[q.id] === option.id"
+                    aria-label="Opción seleccionada"
+                    class="ml-auto mt-1 shrink-0 text-green-700"
+                    :size="18"
+                  />
+                </button>
+              </div>
+
+              <div class="mt-4 flex justify-end">
+                <span v-if="savingAnswer" role="status" aria-live="polite" class="text-xs font-medium text-[#575756]">
+                  Guardando respuesta…
+                </span>
+              </div>
+            </div>
+          </Transition>
+        </div>
+
+        <nav v-if="questions.length" aria-label="Paginación de preguntas" class="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <button type="button" :disabled="current === 0 || savingAnswer" aria-label="Pregunta anterior" title="Pregunta anterior" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#dadada] bg-white text-[#575756] disabled:opacity-35" @click="previous">
+            <ChevronLeft :size="18" />
+          </button>
+
+          <div class="flex flex-1 flex-wrap items-center justify-center gap-2">
+            <button
+              v-for="(item, index) in questions"
+              :key="item.id"
+              type="button"
+              :disabled="index > maxReachableIndex || savingAnswer"
+              :aria-label="`Pregunta ${index + 1}${answers[item.id] ? ', respondida' : ', pendiente'}`"
+              :aria-current="index === current ? 'page' : undefined"
+              :title="`Pregunta ${index + 1}`"
+              class="h-9 w-9 rounded-lg border text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-35"
+              :class="index === current
+                ? 'border-[#575756] bg-[#575756] text-white'
+                : answers[item.id]
+                  ? 'border-[#a3a3a2] bg-[#eeeeed] text-[#292928] hover:bg-[#e5e5e4]'
+                  : 'border-[#dadada] bg-white text-[#878787] hover:border-[#878787]'"
+              @click="goToQuestion(index)"
+            >
+              {{ index + 1 }}
             </button>
           </div>
-          <p v-if="message" class="mt-4 text-sm font-bold text-[#575756]">{{ message }}</p>
-          <div class="mt-8 flex items-center justify-between">
-            <button type="button" class="rounded-xl border border-[#dadada] px-4 py-3 text-sm font-bold disabled:opacity-40" :disabled="current === 0 || savingAnswer" @click="current--">Anterior</button>
-            <button v-if="current < questions.length - 1" type="button" class="rounded-xl bg-[#575756] px-5 py-3 text-sm font-bold text-white disabled:opacity-40" :disabled="answers[q.id] == null || savingAnswer" @click="current++">Siguiente</button>
-            <button v-else type="button" class="rounded-xl bg-[#575756] px-5 py-3 text-sm font-bold text-white disabled:opacity-40" :disabled="!allAnswered || loading || savingAnswer" @click="finish">Finalizar</button>
-          </div>
-        </article>
+
+          <button v-if="canNext" type="button" :disabled="savingAnswer" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#575756] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#454544] disabled:cursor-not-allowed disabled:opacity-50" @click="next">
+            Siguiente pregunta
+            <ChevronRight :size="18" />
+          </button>
+          <button v-else-if="allAnswered && current === maxReachableIndex" type="button" :disabled="loading || savingAnswer" class="inline-flex items-center gap-2 rounded-lg bg-[#575756] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-35" @click="finish">
+            {{ loading ? 'Guardando…' : 'Finalizar' }}
+            <CheckCircle2 :size="18" />
+          </button>
+          <span v-else class="h-10 w-10" aria-hidden="true" />
+        </nav>
       </section>
 
       <EvaluationResult
@@ -359,6 +505,16 @@ onBeforeUnmount(() => {
         @certificate="openCertificate"
       />
     </main>
+
+    <ConfirmDialog
+      v-if="showFinishConfirmation"
+      title="¿Finalizar evaluación?"
+      description="Al finalizar, tus respuestas quedarán registradas y ya no podrás modificarlas. Revisa que todas estén contestadas antes de continuar."
+      confirm-label="Finalizar evaluación"
+      :busy="loading"
+      @cancel="showFinishConfirmation = false"
+      @confirm="finishConfirmed"
+    />
 
     <footer class="mx-auto max-w-6xl px-5 pb-8 text-center text-xs text-[#878787]">
       Fiscalía General de Justicia

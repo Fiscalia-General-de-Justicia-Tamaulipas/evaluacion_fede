@@ -9,18 +9,28 @@ export type AuthUser = {
   maternal_surname: string;
   email: string;
   curp: string;
-  institution: Institution;
+  full_name?: string;
+  institution?: Institution;
+  sector?: { id: number; name: string } | null;
 };
 
-const API = import.meta.env.VITE_API_URL;
+const API = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 const TOKEN_KEY = 'fede_exam_token';
 const USER_KEY = 'fede_exam_user';
 
+function readStoredUser(): AuthUser | null {
+  try {
+    const stored = localStorage.getItem(USER_KEY);
+    return stored ? JSON.parse(stored) as AuthUser : null;
+  } catch {
+    localStorage.removeItem(USER_KEY);
+    return null;
+  }
+}
+
 const token = ref<string | null>(localStorage.getItem(TOKEN_KEY));
-const user = ref<AuthUser | null>(
-  JSON.parse(localStorage.getItem(USER_KEY) || 'null')
-);
+const user = ref<AuthUser | null>(readStoredUser());
 
 const isAuthenticated = computed(() => !!token.value);
 
@@ -47,7 +57,7 @@ function clear() {
 // Convierte el "detail" de una respuesta de error en un mensaje legible.
 // Soporta: string normal, array crudo de errores de Pydantic (por si algún
 // endpoint no pasa por el exception handler en español), u otros formatos.
-function extractErrorMessage(data: any, fallback: string): string {
+export function extractErrorMessage(data: any, fallback: string): string {
   const detail = data?.detail;
 
   if (!detail) return fallback;
@@ -101,14 +111,30 @@ async function login(email: string, password: string) {
   return data.user as AuthUser;
 }
 
-async function register(payload: {
+export type RegisterPayload = {
   first_name: string;
   paternal_surname: string;
   maternal_surname: string;
   email: string;
   password: string;
   curp: string;
-}) {
+  municipality_id?: number | null;
+  municipality_other?: string | null;
+  municipality_other_state?: string | null;
+  gender_id?: number | null;
+  gender_other?: string | null;
+  age_range_id?: number | null;
+  occupation_id?: number | null;
+  occupation_other?: string | null;
+  sector_id?: number | null;
+  indigenous_id?: number | null;
+  afro_mexican_id?: number | null;
+  disability_id?: number | null;
+  lgbtttiq_id?: number | null;
+  education_level_id?: number | null;
+};
+
+async function register(payload: RegisterPayload) {
   const response = await fetch(`${API}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
