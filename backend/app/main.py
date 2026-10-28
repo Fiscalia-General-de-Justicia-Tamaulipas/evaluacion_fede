@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+import hashlib
+from html import escape
+import logging
 import os
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from secrets import SystemRandom
-from urllib.parse import quote_plus
+from secrets import SystemRandom, token_urlsafe
+from urllib.parse import urlencode
+from urllib.request import Request as URLRequest, urlopen
+from urllib.error import URLError, HTTPError
 
 from dotenv import load_dotenv
 
@@ -40,6 +45,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     create_engine,
+    delete,
     inspect,
     select,
     text,
@@ -85,6 +91,15 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(
         "1440",
     )
 )
+
+MAIL_HOST = os.getenv("MAIL_HOST", "").strip()
+MAIL_JWT = os.getenv("MAIL_JWT", "").strip().strip('"').strip("'")
+MAIL_FROM_ADDRESS = os.getenv("MAIL_FROM_ADDRESS", "").strip().strip('"').strip("'")
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    os.getenv("CORS_ORIGINS", "http://localhost:5174").split(",")[0],
+).strip().rstrip("/")
+PASSWORD_RESET_EXPIRE_MINUTES = int(os.getenv("PASSWORD_RESET_EXPIRE_MINUTES", "30"))
 
 
 def score_percentage(value: int | None) -> int | None:
@@ -585,6 +600,20 @@ class User(Base):
             ]
             if part
         ).strip()
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(), nullable=False, index=True)
 
 
 # ============================================================
@@ -1475,25 +1504,25 @@ def seed_questions() -> None:
 
 def seed_module3_questions() -> None:
     module3_questions = [
-        ("¿De conformidad a lo establecido en el Artículo 211 del Código Nacional de Procedimientos Penales, ¿de cuántas etapas se compone el Procedimiento Penal Acusatorio?",
+        ("De conformidad a lo establecido en el Artículo 211 del Código Nacional de Procedimientos Penales, ¿de cuantas etapas se compone el Procedimiento Penal Acusatorio?",
          ["Averiguación previa, instrucción y juicio.", "Inicial, intermedia y Juicio.", "Demanda, emplazamiento y audiencia constitucional."], "B"),
         ("¿Cómo inicia formalmente la etapa de investigación inicial?",
          ["Inicia con la presentación de la denuncia, querella o un requisito equivalente, o bien mediante el conocimiento directo que la autoridad (policía) tenga de un hecho con apariencia de delito.", "Inicia con la presentación de un escrito de acusación que realiza un Ministerio Público ante un Juez de Control, en el que debe especificar un hecho delictivo y las pruebas que pretende desahogar.", "Inicia con la presentación de los alegatos de apertura, para anticiparle al Tribunal de Enjuiciamiento lo que se desahogará en el Juicio."], "A"),
-        ("De conformidad con lo previsto en el numeral 213 del Código Nacional de Procedimientos Penales, ¿cuál tiene por objeto reunir indicios para el esclarecimiento de los hechos y datos de prueba?",
+        ("De conformidad con lo previsto en el numeral 213 del Código Nacional de Procedimientos Penales, tiene por objeto que el Ministerio Público reúna indicios para el esclarecimiento de los hechos y, en su caso, los datos de prueba para sustentar el ejercicio de la acción penal, la acusación contra el imputado y la reparación del daño.",
          ["La investigación", "La acusación", "La sentencia"], "A"),
-        ("¿Cómo se denominan los delitos que el Ministerio Público debe investigar por mandato de ley sin requerir querella formal?",
+        ("Son aquellos delitos que la autoridad investigadora (el Ministerio Público), debe investigar por mandato de ley cuando se entera de los hechos, sin que la víctima o testigos tengan que presentar una querella formal.",
          ["Delitos de oficio.", "Delitos de querella.", "Delitos preterintencionales"], "A"),
         ("¿Cuál es la forma de persecución de los delitos electorales?",
          ["De oficio.", "De querella.", "A petición de parte."], "A"),
-        ("¿Qué figura permite la detención sin orden judicial cuando una persona es sorprendida cometiendo un delito o inmediatamente después?",
+        ("Es una figura jurídica que se refiere al momento en que una persona es sorprendida y detenida mientras comete un delito, o inmediatamente después de haberlo hecho, por lo tanto, se permite la detención del sospechoso sin necesidad de una orden judicial previa.",
          ["Flagrancia", "Orden de comparecencia", "Orden de aprehensión"], "A"),
-        ("¿Qué documento oficial usan los policías para registrar intervenciones, detenciones o hallazgos relacionados con un delito?",
+        ("Es un documento oficial que los policías y elementos de seguridad usan en México para registrar cualquier intervención, detención o hallazgo relacionado con un delito. ",
          ["Averiguación previa.", "Informe policial homologado (IPH).", "Boleta de infracción."], "B"),
-        ("¿Qué tipo de flagrancia ocurre cuando una persona es detenida sin orden judicial inmediatamente después de cometer un delito y es señalada por la víctima, testigo presencial o quien intervino?",
+        ("De conformidad con lo previsto en la fracción segunda inciso b) del artículo 146 del Código Nacional de Procedimientos Penales, es la detención de una persona sin orden judicial realizada inmediatamente después de cometer un delito, cuando la persona detenida es señalada por la víctima u ofendido, un testigo presencial o quien hubiere intervenido con ella en la comisión del delito.",
          ["Flagrancia por señalamiento.", "Flagrancia por hallazgo de indicios o instrumentos del delito.", "Flagrancia por monitoreo de cámaras."], "A"),
-        ("¿Qué autoridad investiga los delitos y persigue a los responsables en representación de la sociedad conforme al numeral 21 constitucional?",
+        ("De acuerdo con lo previsto en el numeral 21 de la Constitución Política de los Estados Unidos Mexicanos, es la autoridad encargada de investigar los delitos y perseguir a los responsables en nombre de la sociedad, forma parte de las Fiscalías Generales de Justicia (ya sea a nivel local en cada estado o a nivel federal) por lo tanto la Guardia Nacional y las Policías actúan bajo su conducción y mando en el ejercicio de esta función.",
          ["Policía Ministerial", "Ministerio Público", "Oficial Ministerial"], "B"),
-        ("¿Ante qué autoridad se denuncian los delitos electorales en Tamaulipas, en una elección local?",
+        ("¿Ante que autoridad se denuncian los delitos electorales en Tamaulipas, en el contexto de una elección local?",
          ["Instituto Electoral de Tamaulipas.", "Tribunal Electoral del Estado de Tamaulipas.", "Fiscalía Especializada en Delitos Electorales de Tamaulipas."], "C"),
     ]
 
@@ -1891,6 +1920,8 @@ async def validation_exception_handler(
     labels = {
         "email": "correo electrónico",
         "password": "contraseña",
+        "new_password": "nueva contraseña",
+        "token": "enlace de recuperación",
         "curp": "CURP",
         "first_name": "nombre",
         "paternal_surname": "apellido paterno",
@@ -2137,6 +2168,15 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+
+
+class PasswordResetRequestIn(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirmIn(BaseModel):
+    token: str = Field(min_length=32, max_length=200)
+    new_password: str = Field(min_length=8, max_length=255)
 
 
 class UserOut(BaseModel):
@@ -2486,6 +2526,124 @@ def register(
 # ============================================================
 # AUTH LOGIN
 # ============================================================
+
+def send_password_reset_email(recipient: str, reset_url: str) -> bool:
+    if not MAIL_HOST or not MAIL_JWT or not MAIL_FROM_ADDRESS:
+        logging.error("Faltan variables de entorno para enviar correos de recuperación.")
+        return False
+
+    safe_reset_url = escape(reset_url, quote=True)
+    body = {
+        "from": MAIL_FROM_ADDRESS,
+        "to": recipient,
+        "email": recipient,
+        "subject": "Recupera tu contraseña",
+        "message": f"""<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:32px 16px;background-color:#f5f5f4;font-family:Arial,Helvetica,sans-serif;color:#292928;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;margin:0 auto;background-color:#ffffff;border:1px solid #e4e4e3;border-radius:16px;">
+      <tr>
+        <td style="padding:36px 32px;text-align:center;">
+          <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#292928;">Recupera tu contraseña</h1>
+          <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#575756;">Recibimos una solicitud para cambiar la contraseña de tu cuenta. Usa el botón para crear una nueva:</p>
+          <a href="{safe_reset_url}" style="display:inline-block;padding:14px 24px;border-radius:9px;background-color:#575756;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;">Crear nueva contraseña</a>
+          <p style="margin:28px 0 8px;font-size:13px;line-height:1.6;color:#777776;">Si el botón no funciona, copia y pega este enlace en tu navegador:</p>
+          <p style="margin:0;word-break:break-all;font-size:12px;line-height:1.6;"><a href="{safe_reset_url}" style="color:#575756;">{safe_reset_url}</a></p>
+          <p style="margin:28px 0 0;font-size:13px;line-height:1.7;color:#777776;">Este enlace vence en {PASSWORD_RESET_EXPIRE_MINUTES} minutos y solo se puede usar una vez. Si no solicitaste el cambio, ignora este correo.</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>""",
+    }
+    request = URLRequest(
+        MAIL_HOST,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Authorization": f"Bearer {MAIL_JWT}",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=15) as response:
+            if 200 <= response.status < 300:
+                return True
+            logging.error("El servicio de correo respondió con HTTP %s.", response.status)
+    except HTTPError as exc:
+        logging.error("El servicio de correo respondió con HTTP %s.", exc.code)
+    except (URLError, TimeoutError, OSError):
+        logging.exception("No se pudo conectar con el servicio de correo.")
+    return False
+
+
+@app.post("/api/auth/password/forgot")
+def request_password_reset(
+    data: PasswordResetRequestIn,
+    db: Session = Depends(get_db),
+):
+    email = str(data.email).strip().lower()
+    user = db.scalar(select(User).where(User.email == email))
+
+    if user:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.execute(delete(PasswordResetToken).where(PasswordResetToken.expires_at <= now))
+        recent_token = db.scalar(
+            select(PasswordResetToken)
+            .where(PasswordResetToken.user_id == user.id)
+            .order_by(PasswordResetToken.created_at.desc())
+        )
+        if recent_token and recent_token.created_at > now - timedelta(seconds=60):
+            return {"message": "Si el correo está registrado, recibirás instrucciones para recuperar tu contraseña."}
+
+        raw_token = token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+        db.add(PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            created_at=now,
+            expires_at=now + timedelta(minutes=PASSWORD_RESET_EXPIRE_MINUTES),
+        ))
+        db.commit()
+
+        reset_url = f"{FRONTEND_URL}/?{urlencode({'reset_token': raw_token})}"
+        if not send_password_reset_email(user.email, reset_url):
+            db.execute(delete(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash))
+            db.commit()
+
+    # Respuesta genérica para no revelar si una dirección está registrada.
+    return {"message": "Si el correo está registrado, recibirás instrucciones para recuperar tu contraseña."}
+
+
+@app.post("/api/auth/password/reset")
+def reset_password(
+    data: PasswordResetConfirmIn,
+    db: Session = Depends(get_db),
+):
+    token_hash = hashlib.sha256(data.token.encode("utf-8")).hexdigest()
+    reset_token = db.scalar(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
+    )
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    if not reset_token or reset_token.expires_at <= now:
+        if reset_token:
+            db.delete(reset_token)
+            db.commit()
+        raise HTTPException(status_code=400, detail="El enlace venció o ya fue utilizado. Solicita uno nuevo.")
+
+    user = db.get(User, reset_token.user_id)
+    if not user:
+        db.delete(reset_token)
+        db.commit()
+        raise HTTPException(status_code=400, detail="El enlace venció o ya fue utilizado. Solicita uno nuevo.")
+
+    user.hashed_password = hash_password(data.new_password)
+    db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+    db.commit()
+    return {"message": "Tu contraseña se actualizó. Ya puedes iniciar sesión."}
 
 @app.post(
     "/api/auth/login",

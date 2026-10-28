@@ -30,6 +30,20 @@ Abrir `http://localhost:5173`.
 
 API: `http://localhost:8000/docs`
 
+## Recuperación de contraseña
+
+El backend envía el enlace con la API institucional de correo. Configura estas variables en `.env`; `FRONTEND_URL` debe ser el origen público donde se sirve la aplicación:
+
+```env
+MAIL_HOST=https://api-correos.fgjtam.gob.mx/api/v1/send-email
+MAIL_FROM_ADDRESS=notificaciones@fgjtam.gob.mx
+MAIL_JWT=<token-vigente-de-la-API-de-correo>
+FRONTEND_URL=http://localhost:5174
+PASSWORD_RESET_EXPIRE_MINUTES=30
+```
+
+El token de correo permanece únicamente en el backend. Los enlaces de recuperación vencen según `PASSWORD_RESET_EXPIRE_MINUTES` (30 minutos por defecto) y se pueden usar una sola vez.
+
 ## Frontend
 
 La documentación de estructura, diseño, flujos, ejecución y pruebas del cliente está en [`frontend/README.md`](frontend/README.md). Los videos por módulo están en `frontend/public/curso-modulo1.mp4`, `curso-modulo2.mp4` y `curso-modulo3.mp4`.

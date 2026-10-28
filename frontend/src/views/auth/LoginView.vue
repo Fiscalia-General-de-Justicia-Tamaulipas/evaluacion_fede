@@ -21,6 +21,7 @@ defineProps<{ notice?: string }>();
 const emit = defineEmits<{
   (e: 'success'): void;
   (e: 'go-register'): void;
+  (e: 'go-forgot'): void;
 }>();
 
 const { login } = useAuth();
@@ -379,7 +380,7 @@ onBeforeUnmount(() => {
               novalidate
             >
               <Transition name="fade">
-                <BaseAlert v-if="notice" variant="success" title="Registro completado" :description="notice" />
+                <BaseAlert v-if="notice" variant="success" title="Aviso" :description="notice" />
               </Transition>
 
               <!-- Email -->
@@ -492,6 +493,12 @@ onBeforeUnmount(() => {
                   </p>
                 </Transition>
               </label>
+
+              <div class="-mt-2 text-right">
+                <button type="button" :disabled="loading" class="text-xs font-semibold text-[#575756] underline decoration-[#c7c7c6] underline-offset-4 transition hover:text-[#292928] disabled:opacity-50" @click="emit('go-forgot')">
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
 
               <!-- Error -->
 

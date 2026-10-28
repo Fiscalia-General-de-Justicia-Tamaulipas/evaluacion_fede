@@ -150,6 +150,32 @@ async function register(payload: RegisterPayload) {
   return data.user as AuthUser;
 }
 
+async function requestPasswordReset(email: string) {
+  const response = await fetch(`${API}/api/auth/password/forgot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(extractErrorMessage(data, 'No se pudo solicitar la recuperación.'));
+  }
+  return data as { message: string };
+}
+
+async function resetPassword(token: string, newPassword: string) {
+  const response = await fetch(`${API}/api/auth/password/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(extractErrorMessage(data, 'No se pudo cambiar la contraseña.'));
+  }
+  return data as { message: string };
+}
+
 
 function logout() {
   clear();
@@ -163,6 +189,8 @@ export function useAuth() {
     fullName,
     login,
     register,
+    requestPasswordReset,
+    resetPassword,
     logout,
     apiFetch,
   };
