@@ -18,9 +18,14 @@ import {
     LogOut,
     FileText,
     X,
+    ArrowLeft,
 } from 'lucide-vue-next';
 
 import { useAuth } from '../lib/auth';
+
+const emit = defineEmits<{
+    (e: 'back'): void;
+}>();
 
 
 /* =========================================================
@@ -1201,6 +1206,16 @@ onUnmounted(() => {
 
 
 
+                    <button
+                        type="button"
+                        @click="emit('back')"
+                        title="Regresar al panel de módulos"
+                        aria-label="Regresar al panel de módulos"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dadada] text-[#878787] transition hover:border-[#575756] hover:text-[#575756]"
+                    >
+                        <ArrowLeft :size="17" />
+                    </button>
+
                     <button @click="logout()" title="Cerrar sesión" class="inline-flex h-9 w-9
                                items-center justify-center
                                rounded-lg border border-[#dadada]
@@ -1575,6 +1590,15 @@ onUnmounted(() => {
                     <div class="flex min-h-screen w-full flex-col">
                         <header class="border-b border-white/10 bg-[#292928] px-5 py-4 md:px-10">
                             <div class="mx-auto flex max-w-7xl items-center gap-4">
+                                <button
+                                    type="button"
+                                    title="Regresar al panel de módulos"
+                                    aria-label="Regresar al panel de módulos"
+                                    class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/15 text-white/75 transition hover:bg-white/10 hover:text-white"
+                                    @click="emit('back')"
+                                >
+                                    <ArrowLeft :size="20" />
+                                </button>
                                 <img
                                     src="/logo_fgjtam.png"
                                     alt="Logo Fiscalía General de Justicia de Tamaulipas"
@@ -1948,7 +1972,7 @@ onUnmounted(() => {
                                 <p class="text-2xl
                                            font-black
                                            text-[#575756]">
-                                    {{ result.score }}%
+                                    {{ result.score }}/10
                                 </p>
 
                                 <p class="mt-1

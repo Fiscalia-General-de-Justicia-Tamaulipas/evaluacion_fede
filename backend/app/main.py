@@ -591,8 +591,13 @@ class Question(Base):
 
     number: Mapped[int] = mapped_column(
         Integer,
-        unique=True,
         nullable=False,
+    )
+
+    module_id: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
     )
 
     text: Mapped[str] = mapped_column(
@@ -604,6 +609,14 @@ class Question(Base):
         back_populates="question",
         cascade="all, delete-orphan",
         order_by="Option.position",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "module_id",
+            "number",
+            name="uq_question_module_number",
+        ),
     )
 
 
@@ -670,6 +683,18 @@ class Evaluation(Base):
         back_populates="evaluations",
     )
 
+    module_id: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+    )
+
+    attempt_number: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+    )
+
     answers: Mapped[list["Answer"]] = relationship(
         back_populates="evaluation",
         cascade="all, delete-orphan",
@@ -716,6 +741,51 @@ class Evaluation(Base):
     question_order: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
+    )
+
+
+class Certificate(Base):
+    __tablename__ = "certificates"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+
+    module_id: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    evaluation_id: Mapped[int] = mapped_column(
+        ForeignKey("evaluations.id"),
+        nullable=False,
+        unique=True,
+    )
+
+    score: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    issued_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "module_id",
+            name="uq_certificate_user_module",
+        ),
     )
 
 
@@ -1366,6 +1436,7 @@ def seed_questions() -> None:
             question = Question(
                 number=question_data["number"],
                 text=question_data["text"],
+                module_id=1,
             )
 
             db.add(question)
@@ -1387,6 +1458,61 @@ def seed_questions() -> None:
                         position=position,
                     )
                 )
+
+        db.commit()
+
+
+def seed_module3_questions() -> None:
+    module3_questions = [
+        ("¿De conformidad a lo establecido en el Artículo 211 del Código Nacional de Procedimientos Penales, ¿de cuántas etapas se compone el Procedimiento Penal Acusatorio?",
+         ["A) Averiguación previa, instrucción y juicio.", "B) Inicial, intermedia y Juicio.", "C) Demanda, emplazamiento y audiencia constitucional."], "B"),
+        ("¿Cómo inicia formalmente la etapa de investigación inicial?",
+         ["A) Inicia con la presentación de la denuncia, querella o un requisito equivalente, o bien mediante el conocimiento directo que la autoridad (policía) tenga de un hecho con apariencia de delito.", "B) Inicia con la presentación de un escrito de acusación que realiza un Ministerio Público ante un Juez de Control, en el que debe especificar un hecho delictivo y las pruebas que pretende desahogar.", "C) Inicia con la presentación de los alegatos de apertura, para anticiparle al Tribunal de Enjuiciamiento lo que se desahogará en el Juicio."], "A"),
+        ("De conformidad con lo previsto en el numeral 213 del Código Nacional de Procedimientos Penales, ¿cuál tiene por objeto reunir indicios para el esclarecimiento de los hechos y datos de prueba?",
+         ["A) La investigación", "B) La acusación", "C) La sentencia"], "A"),
+        ("¿Cómo se denominan los delitos que el Ministerio Público debe investigar por mandato de ley sin requerir querella formal?",
+         ["A) Delitos de oficio.", "B) Delitos de querella.", "C) Delitos preterintencionales"], "A"),
+        ("¿Cuál es la forma de persecución de los delitos electorales?",
+         ["A) De oficio.", "B) De querella.", "C) A petición de parte."], "A"),
+        ("¿Qué figura permite la detención sin orden judicial cuando una persona es sorprendida cometiendo un delito o inmediatamente después?",
+         ["A) Flagrancia", "B) Orden de comparecencia", "C) Orden de aprehensión"], "A"),
+        ("¿Qué documento oficial usan los policías para registrar intervenciones, detenciones o hallazgos relacionados con un delito?",
+         ["A) Averiguación previa.", "B) Informe policial homologado (IPH).", "C) Boleta de infracción."], "B"),
+        ("¿Qué tipo de flagrancia ocurre cuando una persona es detenida sin orden judicial inmediatamente después de cometer un delito y es señalada por la víctima, testigo presencial o quien intervino?",
+         ["A) Flagrancia por señalamiento.", "B) Flagrancia por hallazgo de indicios o instrumentos del delito.", "C) Flagrancia por monitoreo de cámaras."], "A"),
+        ("¿Qué autoridad investiga los delitos y persigue a los responsables en representación de la sociedad conforme al numeral 21 constitucional?",
+         ["A) Policía Ministerial", "B) Ministerio Público", "C) Oficial Ministerial"], "B"),
+        ("¿Ante qué autoridad se denuncian los delitos electorales en Tamaulipas, en una elección local?",
+         ["A) Instituto Electoral de Tamaulipas.", "B) Tribunal Electoral del Estado de Tamaulipas.", "C) Fiscalía Especializada en Delitos Electorales de Tamaulipas."], "C"),
+    ]
+
+    with SessionLocal() as db:
+        existing = db.scalar(
+            select(Question.id)
+            .where(Question.module_id == 3)
+            .limit(1)
+        )
+        if existing:
+            return
+
+        for number, (text, option_texts, correct_letter) in enumerate(module3_questions, start=1):
+            question = Question(
+                number=number,
+                module_id=3,
+                text=text,
+            )
+            db.add(question)
+            db.flush()
+
+            for position, option_text in enumerate(option_texts):
+                letter = chr(ord("A") + position)
+                db.add(Option(
+                    question_id=question.id,
+                    letter=letter,
+                    text=option_text,
+                    is_correct=(letter == correct_letter),
+                    position=position,
+                ))
 
         db.commit()
 
@@ -1479,6 +1605,28 @@ def ensure_evaluation_columns() -> None:
                 )
             )
 
+        if "module_id" not in columns:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE evaluations
+                    ADD COLUMN module_id
+                    INT NOT NULL DEFAULT 1
+                    """
+                )
+            )
+
+        if "attempt_number" not in columns:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE evaluations
+                    ADD COLUMN attempt_number
+                    INT NOT NULL DEFAULT 1
+                    """
+                )
+            )
+
         if "question_order" not in columns:
             connection.execute(
                 text(
@@ -1496,6 +1644,7 @@ def get_evaluation_question_order(
 ) -> list[int]:
     question_ids = db.scalars(
         select(Question.id)
+        .where(Question.module_id == evaluation.module_id)
         .order_by(Question.number)
     ).all()
 
@@ -1614,6 +1763,44 @@ def ensure_answer_unique_constraint() -> None:
             )
 
 
+def ensure_question_module_column() -> None:
+    inspector = inspect(engine)
+    if "questions" not in inspector.get_table_names():
+        return
+
+    columns = {
+        column["name"]
+        for column in inspector.get_columns("questions")
+    }
+    with engine.begin() as connection:
+        if "module_id" not in columns:
+            connection.execute(text(
+                "ALTER TABLE questions "
+                "ADD COLUMN module_id INT NOT NULL DEFAULT 1"
+            ))
+
+        unique_constraints = inspector.get_unique_constraints("questions")
+        for constraint in unique_constraints:
+            constraint_columns = constraint.get("column_names") or []
+            if constraint_columns == ["number"]:
+                connection.execute(text(
+                    f"ALTER TABLE questions DROP INDEX `{constraint['name']}`"
+                ))
+
+        current_constraints = inspect(engine).get_unique_constraints("questions")
+        if not any(
+            set(constraint.get("column_names") or []) == {"module_id", "number"}
+            for constraint in current_constraints
+        ):
+            try:
+                connection.execute(text(
+                    "ALTER TABLE questions ADD CONSTRAINT "
+                    "uq_question_module_number UNIQUE (module_id, number)"
+                ))
+            except Exception as exc:
+                print("No se pudo crear la restricción de módulos de questions:", exc)
+
+
 # ============================================================
 # INITIALIZATION
 # ============================================================
@@ -1636,9 +1823,13 @@ def initialize_database() -> None:
 
     ensure_answer_unique_constraint()
 
+    ensure_question_module_column()
+
     seed_profile_catalogs()
 
     seed_questions()
+
+    seed_module3_questions()
 
 
 # ============================================================
@@ -2330,14 +2521,18 @@ def me(
 
 @app.get("/api/questions")
 def get_questions(
+    module_id: int = 1,
     db: Session = Depends(get_db),
     current_user: User = Depends(
         get_current_user
     ),
 ):
+    if module_id not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Módulo no válido.")
 
     questions = db.scalars(
         select(Question)
+        .where(Question.module_id == module_id)
         .order_by(Question.number)
     ).all()
 
@@ -2359,6 +2554,95 @@ def get_questions(
     ]
 
 
+@app.get("/api/modules/status")
+def get_modules_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    module_names = {
+        1: "Nociones básicas de derecho electoral",
+        2: "Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales",
+        3: "Integración de la carpeta de investigación, primer respondiente, retos y cultura de prevención",
+    }
+    result = []
+
+    for module_id, name in module_names.items():
+        completed = db.scalars(
+            select(Evaluation).where(
+                Evaluation.user_id == current_user.id,
+                Evaluation.module_id == module_id,
+                Evaluation.completed_at.is_not(None),
+            ).order_by(Evaluation.completed_at.desc())
+        ).all()
+
+        certificate = db.scalar(
+            select(Certificate).where(
+                Certificate.user_id == current_user.id,
+                Certificate.module_id == module_id,
+            )
+        )
+        best_score = max(
+            (int(item.score) for item in completed if item.score is not None),
+            default=None,
+        )
+        result.append({
+            "module_id": module_id,
+            "name": name,
+            "attempts": len(completed),
+            "attempts_remaining": max(0, 3 - len(completed)),
+            "best_score": best_score,
+            "passed": best_score is not None and best_score >= 7,
+            "questions_available": module_id != 2 and db.scalar(
+                select(text("COUNT(*)")).select_from(Question).where(
+                    Question.module_id == module_id
+                )
+            ) > 0,
+            "certificate": {
+                "id": certificate.id,
+                "score": certificate.score,
+                "issued_at": certificate.issued_at,
+            } if certificate else None,
+        })
+
+    return {"modules": result}
+
+
+@app.get("/api/certificates/{module_id}")
+def get_certificate(
+    module_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if module_id not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Módulo no válido.")
+
+    certificate = db.scalar(
+        select(Certificate).where(
+            Certificate.user_id == current_user.id,
+            Certificate.module_id == module_id,
+        )
+    )
+    if not certificate:
+        raise HTTPException(
+            status_code=404,
+            detail="No existe constancia para este módulo.",
+        )
+
+    module_names = {
+        1: "Nociones básicas de derecho electoral",
+        2: "Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales",
+        3: "Integración de la carpeta de investigación, primer respondiente, retos y cultura de prevención",
+    }
+    return {
+        "id": certificate.id,
+        "user_name": current_user.full_name,
+        "module_id": module_id,
+        "module_name": module_names[module_id],
+        "score": certificate.score,
+        "issued_at": certificate.issued_at,
+    }
+
+
 # ============================================================
 # EVALUATIONS - CURRENT
 # ============================================================
@@ -2367,17 +2651,21 @@ def get_questions(
     "/api/evaluations/current"
 )
 def get_current_evaluation(
+    module_id: int = 1,
     db: Session = Depends(get_db),
     current_user: User = Depends(
         get_current_user
     ),
 ):
+    if module_id not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Módulo no válido.")
 
     evaluation = db.scalar(
         select(Evaluation)
         .where(
             Evaluation.user_id ==
             current_user.id,
+            Evaluation.module_id == module_id,
 
             Evaluation.completed_at.is_(None),
         )
@@ -2457,17 +2745,27 @@ def get_current_evaluation(
     "/api/evaluations/start"
 )
 def start_evaluation(
+    module_id: int = 1,
     db: Session = Depends(get_db),
     current_user: User = Depends(
         get_current_user
     ),
 ):
+    if module_id not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Módulo no válido.")
+
+    if module_id == 2:
+        raise HTTPException(
+            status_code=409,
+            detail="El cuestionario del Módulo 2 estará disponible cuando se incorporen las preguntas.",
+        )
 
     existing_evaluation = db.scalar(
         select(Evaluation)
         .where(
             Evaluation.user_id ==
             current_user.id,
+            Evaluation.module_id == module_id,
 
             Evaluation.completed_at.is_(None),
         )
@@ -2551,6 +2849,7 @@ def start_evaluation(
     total_questions = db.scalar(
         select(text("COUNT(*)"))
         .select_from(Question)
+        .where(Question.module_id == module_id)
     )
 
     total_questions = int(
@@ -2563,14 +2862,48 @@ def start_evaluation(
             detail="No existen preguntas configuradas.",
         )
 
+    completed_attempts = db.scalar(
+        select(text("COUNT(*)"))
+        .select_from(Evaluation)
+        .where(
+            Evaluation.user_id == current_user.id,
+            Evaluation.module_id == module_id,
+            Evaluation.completed_at.is_not(None),
+        )
+    )
+    completed_attempts = int(completed_attempts or 0)
+
+    best_score = db.scalar(
+        select(Evaluation.score)
+        .where(
+            Evaluation.user_id == current_user.id,
+            Evaluation.module_id == module_id,
+            Evaluation.completed_at.is_not(None),
+        )
+        .order_by(Evaluation.score.desc())
+    )
+    if best_score is not None and int(best_score) >= 7:
+        raise HTTPException(
+            status_code=409,
+            detail="Este módulo ya fue aprobado.",
+        )
+    if completed_attempts >= 3:
+        raise HTTPException(
+            status_code=409,
+            detail="Has agotado los 3 intentos disponibles para este módulo.",
+        )
+
     question_order = db.scalars(
         select(Question.id)
+        .where(Question.module_id == module_id)
         .order_by(Question.number)
     ).all()
     SystemRandom().shuffle(question_order)
 
     evaluation = Evaluation(
         user_id=current_user.id,
+        module_id=module_id,
+        attempt_number=completed_attempts + 1,
         started_at=datetime.now(
             timezone.utc
         ),
@@ -2725,6 +3058,11 @@ def save_answer(
         raise HTTPException(
             status_code=400,
             detail="La pregunta no existe.",
+        )
+    if question.module_id != evaluation.module_id:
+        raise HTTPException(
+            status_code=400,
+            detail="La pregunta no pertenece a este módulo.",
         )
 
     # --------------------------------------------------------
@@ -2938,6 +3276,7 @@ def finish_evaluation(
 
     questions_list = db.scalars(
         select(Question)
+        .where(Question.module_id == evaluation.module_id)
         .order_by(Question.number)
     ).all()
 
@@ -3005,9 +3344,7 @@ def finish_evaluation(
         if answer.is_correct
     )
 
-    score = round(
-        (correct / total) * 100
-    )
+    score = round((correct / total) * 10)
 
     # --------------------------------------------------------
     # GUARDAR RESULTADO
@@ -3022,6 +3359,27 @@ def finish_evaluation(
     evaluation.completed_at = (
         datetime.now(timezone.utc)
     )
+
+    certificate_id = None
+    if score >= 7:
+        existing_certificate = db.scalar(
+            select(Certificate).where(
+                Certificate.user_id == current_user.id,
+                Certificate.module_id == evaluation.module_id,
+            )
+        )
+        if not existing_certificate:
+            certificate = Certificate(
+                user_id=current_user.id,
+                module_id=evaluation.module_id,
+                evaluation_id=evaluation.id,
+                score=score,
+            )
+            db.add(certificate)
+            db.flush()
+            certificate_id = certificate.id
+        else:
+            certificate_id = existing_certificate.id
 
     db.commit()
 
@@ -3044,4 +3402,12 @@ def finish_evaluation(
 
         "total":
             total,
+        "module_id":
+            evaluation.module_id,
+        "attempt_number":
+            evaluation.attempt_number,
+        "passed":
+            score >= 7,
+        "certificate_id":
+            certificate_id,
     }
