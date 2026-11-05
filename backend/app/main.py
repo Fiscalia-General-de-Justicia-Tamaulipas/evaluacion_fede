@@ -2839,11 +2839,16 @@ def get_modules_status(
     module_names = {
         1: "Nociones básicas de derecho electoral",
         2: "Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales",
-        3: "Integración de la carpeta de investigación, primer respondiente, retos y cultura de prevención",
+        3: "Integración de la carpeta de investigación, primer respondiente, retos en la investigación y cultura de prevención",
     }
     result = []
 
     for module_id, name in module_names.items():
+        questions_available = int(db.scalar(
+            select(text("COUNT(*)")).select_from(Question).where(
+                Question.module_id == module_id
+            )
+        ) or 0) > 0
         completed = db.scalars(
             select(Evaluation).where(
                 Evaluation.user_id == current_user.id,
@@ -2877,11 +2882,7 @@ def get_modules_status(
             "best_score": best_score,
             "passed": best_score is not None and best_score >= PASSING_SCORE,
             "in_progress": in_progress,
-            "questions_available": module_id != 2 and db.scalar(
-                select(text("COUNT(*)")).select_from(Question).where(
-                    Question.module_id == module_id
-                )
-            ) > 0,
+            "questions_available": questions_available,
             "certificate": {
                 "id": certificate.id,
                 "score": certificate.score,
@@ -2916,7 +2917,7 @@ def get_certificate(
     module_names = {
         1: "Nociones básicas de derecho electoral",
         2: "Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales",
-        3: "Integración de la carpeta de investigación, primer respondiente, retos y cultura de prevención",
+        3: "Integración de la carpeta de investigación, primer respondiente, retos en la investigación y cultura de prevención",
     }
     return {
         "id": certificate.id,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { BookOpen, CheckCircle2, LockKeyhole } from 'lucide-vue-next';
+import { BookOpen, CheckCircle2 } from 'lucide-vue-next';
 import { useAuth } from '../../services/auth';
 import InstitutionalHeader from '../../components/layout/InstitutionalHeader.vue';
 import BaseAlert from '../../components/ui/BaseAlert.vue';
@@ -30,7 +30,7 @@ const error = ref('');
 const titles = [
   'Nociones básicas de derecho electoral',
   'Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales',
-  'Integración de la carpeta de investigación, primer respondiente, retos y cultura de prevención',
+  'Integración de la carpeta de investigación, primer respondiente, retos en la investigación y cultura de prevención',
 ];
 
 async function loadStatus() {
@@ -77,7 +77,7 @@ onMounted(loadStatus);
           v-for="module in modules"
           :key="module.module_id"
           type="button"
-          class="module-card group h-[320px] w-full text-left"
+          class="module-card group h-[350px] w-full text-left"
           :disabled="loading"
           @click="emit('select-module', module.module_id)"
         >
@@ -85,11 +85,10 @@ onMounted(loadStatus);
             <div class="flex items-center justify-between">
               <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#575756] text-sm font-black text-white">{{ module.module_id }}</span>
               <CheckCircle2 v-if="module.passed" :size="21" class="text-[#575756]" />
-              <LockKeyhole v-else-if="!module.questions_available && module.module_id === 2" :size="21" class="text-[#878787]" />
               <BookOpen v-else :size="21" class="text-[#878787]" />
             </div>
             <p class="mt-6 text-xs font-bold uppercase tracking-widest text-[#878787]">Módulo {{ module.module_id }}</p>
-            <h2 class="mt-2 line-clamp-3 min-h-[4.5rem] text-lg font-black leading-6">{{ titleFor(module.module_id) }}</h2>
+            <h2 class="mt-2 min-h-[6rem] text-base font-black leading-6 md:text-base">{{ titleFor(module.module_id) }}</h2>
             <div class="mt-auto min-h-[3.75rem] border-t border-[#e5e5e5] pt-4 text-sm">
               <template v-if="module.passed">
                 <p class="font-bold text-[#575756]">Aprobado · {{ module.best_score }}/100</p>
@@ -98,10 +97,6 @@ onMounted(loadStatus);
               <template v-else-if="module.in_progress">
                 <p class="font-bold text-[#575756]">Evaluación en curso</p>
                 <p class="mt-1 text-xs text-[#878787]">Selecciona para continuar donde te quedaste</p>
-              </template>
-              <template v-else-if="module.module_id === 2 && !module.questions_available">
-                <p class="font-bold text-[#878787]">Cuestionario pendiente</p>
-                <p class="mt-1 text-xs text-[#575756]">Aún no se han cargado preguntas para este módulo.</p>
               </template>
               <template v-else>
                 <p class="text-[#878787]">{{ module.attempts ?? 0 }} de 3 intentos usados</p>
