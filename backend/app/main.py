@@ -1502,6 +1502,91 @@ def seed_questions() -> None:
         db.commit()
 
 
+def seed_module2_questions() -> None:
+    module2_questions = [
+        (
+            "De conformidad con lo previsto en el Artículo 14 ter del Código Penal del Estado de Tamaulipas, es entendido como la conducta típica, antijuridica y culpable a la que se le atribuyen una o varias sanciones penales.",
+            ["La culpabilidad", "El derecho penal.", "El delito"],
+            "C",
+        ),
+        (
+            "Es el acto u omisión que contraviene las disposiciones legales en materia electoral y que atenta contra la certeza y efectividad del sufragio.",
+            ["Delito electoral", "Tipicidad", "Conducta"],
+            "A",
+        ),
+        (
+            "Solicitar votos por paga, promesa de dinero u otra contraprestación, durante la campaña electoral, el día de la jornada electoral o en los tres días previos a la misma, corresponde a un delito electoral ¿cuál es el elemento temporal que exige esta descripción?",
+            ["que exista un pago de por medio.", "que la conducta se lleve a cabo durante la campaña electoral, el día de la jornada electoral o tres días previos a la misma.", "que exista una promesa previa de pago."],
+            "B",
+        ),
+        (
+            "De la interpretación de la fracción IV del numeral 11 de la Ley General en Materia de Delitos Electorales, los servidores públicos solamente tienen permitido asistir a eventos proselitistas como lo son precampañas y campañas electorales fuera de sus horarios laborales, siempre y cuando no utilizan vehículos oficiales, o uniforme institucional.",
+            ["verdadero", "falso"],
+            "A",
+        ),
+        (
+            "De los siguientes delitos electorales ¿cuáles admiten prisión preventiva oficiosa?",
+            ["traslado/acarreo de votantes.", "uso de programas sociales con fines electorales.", "compra de votos."],
+            "B",
+        ),
+        (
+            "Que autoridad electoral en material penal será competente para conocer de un delito electoral, cuando existen indicios suficientes para establecer el financiamiento indebido de alguna campaña electoral proveniente de la Delincuencia Organizada.",
+            ["Fiscalía Especializada en Materia de Delitos Electorales (FISEL) de la FGR.", "Fiscalía Especializa en Delitos Electorales de Tamaulipas (FEDE) de la FGJ.", "Unidad Técnica de Fiscalización del INE."],
+            "A",
+        ),
+        (
+            "¿Cuál es la autoridad electoral que será competente de conocer de un delito electoral que surge en el contexto de una elección de Alcaldías y Diputaciones locales, como pudiera ser la utilización de vehículos del ayuntamiento para asistir a actos de campaña?",
+            ["Fiscalía Especializada en Materia de Delitos Electorales (FISEL) de la FGR", "Fiscalía Especializada en Delitos Electorales de Tamaulipas (FEDE)", "Tribunal Electoral del Poder Judicial de la Federación."],
+            "B",
+        ),
+        (
+            "¿Cuál es la característica del voto que se trasgrede cuando una persona pretende votar con una credencial que no le pertenece?",
+            ["intransferible", "secreto", "libre"],
+            "A",
+        ),
+        (
+            "¿Cuál es la principio constitucional que se trasgrede cuando se alteran los resultados electorales, o se introducen boletas previamente marcadas en favor de algún partido político o candidato.",
+            ["oralidad y publicidad.", "lealtad, objetividad y buena fe.", "elecciones libres, auténticas y periódicas"],
+            "C",
+        ),
+        (
+            "¿Cuál es el principio que garantiza condiciones de igualdad real y justicia para todos los partidos políticos y candidatos? Este principio busca que ningún participante tenga ventajas indebidas que afecten los resultados de la elección y se trasgrede cuando se destinan bienes o servicios públicos en beneficio de un candidato o partido politico.",
+            ["equidad en la contienda", "máxima publicidad", "oralidad"],
+            "A",
+        ),
+    ]
+
+    with SessionLocal() as db:
+        existing = db.scalar(
+            select(Question.id)
+            .where(Question.module_id == 2)
+            .limit(1)
+        )
+        if existing:
+            return
+
+        for number, (text, option_texts, correct_letter) in enumerate(module2_questions, start=1):
+            question = Question(
+                number=number,
+                module_id=2,
+                text=text,
+            )
+            db.add(question)
+            db.flush()
+
+            for position, option_text in enumerate(option_texts):
+                letter = chr(ord("A") + position)
+                db.add(Option(
+                    question_id=question.id,
+                    letter=letter,
+                    text=option_text,
+                    is_correct=(letter == correct_letter),
+                    position=position,
+                ))
+
+        db.commit()
+
+
 def seed_module3_questions() -> None:
     module3_questions = [
         ("De conformidad a lo establecido en el Artículo 211 del Código Nacional de Procedimientos Penales, ¿de cuantas etapas se compone el Procedimiento Penal Acusatorio?",
@@ -1868,6 +1953,8 @@ def initialize_database() -> None:
     seed_profile_catalogs()
 
     seed_questions()
+
+    seed_module2_questions()
 
     seed_module3_questions()
 
@@ -2985,12 +3072,6 @@ def start_evaluation(
 ):
     if module_id not in (1, 2, 3):
         raise HTTPException(status_code=400, detail="Módulo no válido.")
-
-    if module_id == 2:
-        raise HTTPException(
-            status_code=409,
-            detail="El cuestionario del Módulo 2 estará disponible cuando se incorporen las preguntas.",
-        )
 
     existing_evaluation = db.scalar(
         select(Evaluation)
