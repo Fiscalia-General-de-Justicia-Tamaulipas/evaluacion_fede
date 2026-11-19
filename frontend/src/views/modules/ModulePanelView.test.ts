@@ -40,6 +40,7 @@ describe('acceso secuencial a módulos', () => {
     const cards = wrapper.findAll('article');
     const buttons = cards.map(card => card.find('button'));
 
+    expect(wrapper.text()).toContain('Delitos Electorales y su investigación en el Sistema Electoral Mexicano');
     expect(buttons[0].element.disabled).toBe(true);
     expect(buttons[0].text()).toContain('Ya acreditado');
     expect(buttons[1].element.disabled).toBe(false);

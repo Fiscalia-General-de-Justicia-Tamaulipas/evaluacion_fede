@@ -41,6 +41,7 @@ const titles = [
   'Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales',
   'Integración de la carpeta de investigación, primer respondiente, retos en la investigación y cultura de prevención',
 ];
+const courseTitle = 'Delitos Electorales y su investigación en el Sistema Electoral Mexicano';
 
 async function loadStatus() {
   loading.value = true;
@@ -102,7 +103,7 @@ onMounted(loadStatus);
     <InstitutionalHeader :show-back="true" back-label="Cursos disponibles" :show-logout="true" @back="emit('back-courses')" @logout="logout" />
 
     <main id="main-content" tabindex="-1" class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-      <header class="max-w-3xl">
+      <header class="max-w-4xl">
         <p class="text-sm font-semibold text-[var(--color-accent)]">Capacitación institucional</p>
         <h1 class="mt-2 text-3xl font-bold leading-tight tracking-tight text-[var(--color-brand-950)] sm:text-4xl">Bienvenido, {{ fullName }}</h1>
         <p class="mt-4 text-base leading-7 text-[var(--color-muted)]">Selecciona un módulo para continuar tu capacitación. La calificación mínima para acreditar es de <strong class="font-semibold text-[var(--color-brand-900)]">70 de 100 puntos</strong>.</p>
@@ -113,9 +114,12 @@ onMounted(loadStatus);
       </BaseAlert>
 
       <section class="mt-8 sm:mt-10" aria-labelledby="modules-heading" :aria-busy="loading">
-        <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
-          <h2 id="modules-heading" class="text-xl font-bold text-[var(--color-brand-950)] sm:text-2xl">Tus módulos</h2>
-          <p class="text-sm text-[var(--color-muted)]">{{ loading ? 'Consultando avance…' : `${modules.length} ${modules.length === 1 ? 'módulo del curso' : 'módulos del curso'}` }}</p>
+        <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div class="min-w-0 max-w-3xl border-l-2 border-[var(--color-brand-700)] py-1 pl-4">
+            <h2 id="modules-heading" class="mt-2 text-2xl font-bold leading-tight tracking-tight text-[var(--color-brand-950)] sm:text-3xl">{{ courseTitle }}</h2>
+            <p class="mt-2 text-sm font-semibold text-[var(--color-muted)]">Tus módulos</p>
+          </div>
+          <p class="shrink-0 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-1.5 text-sm font-semibold text-[var(--color-muted)]">{{ loading ? 'Consultando avance…' : `${modules.length} ${modules.length === 1 ? 'módulo del curso' : 'módulos del curso'}` }}</p>
         </div>
 
       <div class="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">

@@ -7,11 +7,11 @@ export type CertificateIssueData = {
   issued_at: string;
 };
 
-const PAGE_WIDTH = 1024;
-const PAGE_HEIGHT = 768;
+const LAYOUT_WIDTH = 1024;
+const LAYOUT_HEIGHT = 768;
 
-function centeredTextX(text: string, font: PDFFont, size: number) {
-  return Math.max(32, (PAGE_WIDTH - font.widthOfTextAtSize(text, size)) / 2);
+function centeredTextX(text: string, font: PDFFont, size: number, pageWidth: number, minMargin: number) {
+  return Math.max(minMargin, (pageWidth - font.widthOfTextAtSize(text, size)) / 2);
 }
 
 function wrapName(name: string, font: PDFFont, size: number, maxWidth: number) {
@@ -31,7 +31,7 @@ function wrapName(name: string, font: PDFFont, size: number, maxWidth: number) {
 }
 
 export async function generateCourseCertificate(data: CertificateIssueData): Promise<void> {
-  const templateResponse = await fetch('/constancia-template.jpg');
+  const templateResponse = await fetch('/constancia-template.pdf');
   if (!templateResponse.ok) throw new Error('No se pudo cargar la plantilla institucional de la constancia.');
 
   const [{ PDFDocument, rgb, StandardFonts }, { default: QRCode }] = await Promise.all([
@@ -39,23 +39,25 @@ export async function generateCourseCertificate(data: CertificateIssueData): Pro
     import('qrcode'),
   ]);
   const institutionalGray = rgb(87 / 255, 87 / 255, 86 / 255);
-  const pdf = await PDFDocument.create();
-  const template = await pdf.embedJpg(await templateResponse.arrayBuffer());
-  const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  page.drawImage(template, { x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT });
+  const pdf = await PDFDocument.load(await templateResponse.arrayBuffer());
+  if (pdf.getPageCount() !== 1) throw new Error('La plantilla institucional debe tener una sola página.');
+  const page = pdf.getPages()[0];
+  const { width: pageWidth, height: pageHeight } = page.getSize();
+  const scaleX = pageWidth / LAYOUT_WIDTH;
+  const scaleY = pageHeight / LAYOUT_HEIGHT;
 
   const nameFont = await pdf.embedFont(StandardFonts.HelveticaBold);
   const detailFont = await pdf.embedFont(StandardFonts.Helvetica);
-  let nameSize = 25;
-  let nameLines = wrapName(data.user_name, nameFont, nameSize, PAGE_WIDTH - 96);
-  while (nameLines.length > 2 && nameSize > 16) {
-    nameSize -= 1;
-    nameLines = wrapName(data.user_name, nameFont, nameSize, PAGE_WIDTH - 96);
+  let nameSize = 25 * scaleY;
+  let nameLines = wrapName(data.user_name, nameFont, nameSize, pageWidth - 96 * scaleX);
+  while (nameLines.length > 2 && nameSize > 16 * scaleY) {
+    nameSize -= scaleY;
+    nameLines = wrapName(data.user_name, nameFont, nameSize, pageWidth - 96 * scaleX);
   }
   nameLines.forEach((line, index) => {
     page.drawText(line, {
-      x: centeredTextX(line, nameFont, nameSize),
-      y: 365 - index * (nameSize + 2),
+      x: centeredTextX(line, nameFont, nameSize, pageWidth, 32 * scaleX),
+      y: 365 * scaleY - index * (nameSize + 2 * scaleY),
       size: nameSize,
       font: nameFont,
       color: institutionalGray,
@@ -70,16 +72,16 @@ export async function generateCourseCertificate(data: CertificateIssueData): Pro
     color: { dark: '#575756', light: '#FFFFFF' },
   });
   const qr = await pdf.embedPng(qrDataUrl);
-  const qrSize = 60;
-  const qrX = 932;
-  const qrY = 70;
+  const qrSize = 60 * scaleY;
+  const qrX = 932 * scaleX;
+  const qrY = 70 * scaleY;
   page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
 
-  const folioSize = 7;
+  const folioSize = 7 * scaleY;
   const folioWidth = detailFont.widthOfTextAtSize(data.folio, folioSize);
   page.drawText(data.folio, {
     x: qrX + (qrSize - folioWidth) / 2,
-    y: qrY - 13,
+    y: qrY - 13 * scaleY,
     size: folioSize,
     font: detailFont,
     color: institutionalGray,

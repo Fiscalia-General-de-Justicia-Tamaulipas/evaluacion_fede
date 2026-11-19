@@ -72,13 +72,6 @@ def upgrade() -> None:
             )
         )
 
-    existing_uniques = {
-        tuple(constraint["column_names"] or []): constraint["name"]
-        for constraint in inspector.get_unique_constraints("certificates")
-    }
-    if ("user_id", "module_id") in existing_uniques:
-        op.drop_constraint(existing_uniques[("user_id", "module_id")], "certificates", type_="unique")
-
     updated_columns = {column["name"]: column for column in sa.inspect(bind).get_columns("certificates")}
     for name in ("module_id", "evaluation_id", "score"):
         if name in updated_columns and not updated_columns[name]["nullable"]:
@@ -98,16 +91,23 @@ def upgrade() -> None:
                 nullable=False,
             )
 
-    unique_names = {
-        constraint["name"]
+    existing_uniques = {
+        tuple(constraint["column_names"] or []): constraint["name"]
         for constraint in sa.inspect(bind).get_unique_constraints("certificates")
     }
-    if "uq_certificate_user_course" not in unique_names:
+    if ("user_id", "course_key") not in existing_uniques:
         op.create_unique_constraint(
             "uq_certificate_user_course",
             "certificates",
             ["user_id", "course_key"],
         )
+    if ("user_id", "module_id") in existing_uniques:
+        op.drop_constraint(existing_uniques[("user_id", "module_id")], "certificates", type_="unique")
+
+    unique_names = {
+        constraint["name"]
+        for constraint in sa.inspect(bind).get_unique_constraints("certificates")
+    }
     if "uq_certificate_folio" not in unique_names:
         op.create_unique_constraint("uq_certificate_folio", "certificates", ["folio"])
 

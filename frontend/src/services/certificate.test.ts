@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PDFDict, PDFDocument, PDFName, PDFPage } from 'pdf-lib';
 import { generateCourseCertificate } from './certificate';
 
-const templateBytes = readFileSync(new URL('../../public/constancia-template.jpg', import.meta.url));
+const templateBytes = readFileSync(new URL('../../public/constancia-template.pdf', import.meta.url));
 const anchor = { href: '', download: '', click: vi.fn(), remove: vi.fn() };
 let generatedBlob: Blob | null = null;
 
@@ -35,7 +35,7 @@ describe('generateCourseCertificate', () => {
     vi.unstubAllGlobals();
   });
 
-  it('creates a single-page PDF with template, QR and an unlabeled folio below it, without a printed date', async () => {
+  it('preserves the PDF template while adding the name, QR and unlabeled folio without a printed date', async () => {
     const textDraws = vi.spyOn(PDFPage.prototype, 'drawText');
     const imageDraws = vi.spyOn(PDFPage.prototype, 'drawImage');
     await generateCourseCertificate({
@@ -45,7 +45,7 @@ describe('generateCourseCertificate', () => {
       issued_at: '2026-11-19T17:00:00Z',
     });
 
-    expect(fetch).toHaveBeenCalledWith('/constancia-template.jpg');
+    expect(fetch).toHaveBeenCalledWith('/constancia-template.pdf');
     expect(anchor.download).toBe('constancia-FEDE-2026-0123456789ABCDEF.pdf');
     expect(anchor.href).toBe('blob:constancia');
     expect(anchor.click).toHaveBeenCalledOnce();
@@ -54,13 +54,19 @@ describe('generateCourseCertificate', () => {
 
     const pdf = await PDFDocument.load(new Uint8Array(await generatedBlob!.arrayBuffer()));
     expect(pdf.getPageCount()).toBe(1);
+    expect(pdf.getPages()[0].getSize()).toEqual({ width: 792, height: 612 });
     const xObjects = pdf.getPages()[0].node.Resources().lookup(PDFName.of('XObject'), PDFDict);
-    expect(xObjects.keys()).toHaveLength(2);
+    expect(xObjects.keys()).toHaveLength(6);
     expect(textDraws.mock.calls.map(([text]) => text)).toEqual([
       'Ada López Pérez',
       'FEDE-2026-0123456789ABCDEF',
     ]);
-    expect(textDraws.mock.calls[1][1]).toMatchObject({ y: 57, size: 7 });
-    expect(imageDraws.mock.calls[1][1]).toMatchObject({ x: 932, y: 70, width: 60, height: 60 });
+    expect(textDraws.mock.calls[1][1].y).toBeCloseTo(57 * (612 / 768));
+    expect(textDraws.mock.calls[1][1].size).toBeCloseTo(7 * (612 / 768));
+    expect(imageDraws).toHaveBeenCalledOnce();
+    expect(imageDraws.mock.calls[0][1].x).toBeCloseTo(932 * (792 / 1024));
+    expect(imageDraws.mock.calls[0][1].y).toBeCloseTo(70 * (612 / 768));
+    expect(imageDraws.mock.calls[0][1].width).toBeCloseTo(60 * (612 / 768));
+    expect(imageDraws.mock.calls[0][1].height).toBeCloseTo(60 * (612 / 768));
   });
 });
