@@ -82,8 +82,8 @@ DATABASE_URL = os.getenv(
 
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
-    "change-this-secret-key",
-)
+    "",
+).strip()
 
 JWT_ALGORITHM = "HS256"
 
@@ -2046,6 +2046,10 @@ async def validation_exception_handler(
 
 @app.on_event("startup")
 def startup_event():
+    if len(SECRET_KEY) < 32:
+        raise RuntimeError(
+            "SECRET_KEY debe configurarse con al menos 32 caracteres aleatorios."
+        )
     initialize_database()
 
 
@@ -3559,7 +3563,6 @@ def save_answer(
             "evaluation_id": evaluation.id,
             "question_id": question.id,
             "option_id": option.id,
-            "is_correct": existing_answer.is_correct,
         }
 
     expected_index = get_next_unanswered_index(
@@ -3600,8 +3603,6 @@ def save_answer(
         "option_id":
             option.id,
 
-        "is_correct":
-            answer.is_correct,
     }
 
 

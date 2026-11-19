@@ -18,8 +18,17 @@ MYSQL_USER=evaluacion
 MYSQL_PASSWORD=evaluacion_secret
 MYSQL_ROOT_PASSWORD=root_secret
 DATABASE_URL=mysql+pymysql://evaluacion:evaluacion_secret@db:3306/evaluacion_fede?charset=utf8mb4
+SECRET_KEY=
 CORS_ORIGINS=http://localhost:5173
 ```
+
+Genera un valor distinto para `SECRET_KEY` en cada entorno (al menos 32 caracteres aleatorios); la API no inicia si falta:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Guarda el resultado en `.env` y no lo compartas ni lo incluyas en el repositorio.
 
 ## Arranque
 
