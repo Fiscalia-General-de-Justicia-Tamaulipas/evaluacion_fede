@@ -74,7 +74,7 @@ async function submit() {
         <form class="mt-7 space-y-5" @submit.prevent="submit">
           <label v-if="!isResetMode" class="block">
             <span class="mb-2 block text-[13px] font-semibold text-[#454544]">Correo electrónico</span>
-            <div class="flex h-[52px] items-center gap-3 rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 transition focus-within:border-[#a3a3a2]">
+            <div class="flex h-[52px] items-center gap-3 rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus-within:border-[#a3a3a2]">
               <Mail :size="18" class="shrink-0 text-[#a5a5a4]" />
               <input v-model="email" type="email" required autocomplete="email" placeholder="Tu correo electrónico" :disabled="loading" class="w-full bg-transparent text-sm outline-none placeholder:text-[#b8b8b7] disabled:opacity-50" />
             </div>
@@ -100,13 +100,13 @@ async function submit() {
           <BaseAlert v-if="error" variant="destructive" title="No se pudo completar la solicitud" :description="error" />
           <BaseAlert v-if="success" variant="success" title="Revisa tu correo" :description="success" />
 
-          <button type="submit" :disabled="loading || !!success" class="flex h-[54px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[#292928] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(41,41,40,0.16)] transition hover:bg-[#1f1f1e] disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" :disabled="loading || !!success" class="page-control page-press flex h-[54px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[#292928] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(41,41,40,0.16)] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#1f1f1e] disabled:cursor-not-allowed disabled:opacity-60">
             <Loader2 v-if="loading" :size="18" class="animate-spin" />
             <span>{{ loading ? 'Procesando…' : isResetMode ? 'Guardar contraseña' : 'Enviar enlace' }}</span>
           </button>
         </form>
 
-        <button type="button" class="mt-6 flex w-full items-center justify-center gap-2 text-sm font-semibold text-[#575756] transition hover:text-[#292928]" @click="emit('go-login')">
+        <button type="button" class="page-control page-press mt-6 flex w-full items-center justify-center gap-2 text-sm font-semibold text-[#575756] [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#292928]" @click="emit('go-login')">
           <ArrowLeft :size="16" /> Volver a iniciar sesión
         </button>
       </section>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import {
   LogIn,
   Mail,
@@ -80,110 +80,6 @@ async function onSubmit() {
   }
 }
 
-const canvasRef = ref<HTMLCanvasElement | null>(null);
-
-let ctx: CanvasRenderingContext2D | null = null;
-let animationFrame = 0;
-
-let particles: {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  r: number;
-}[] = [];
-
-function resizeCanvas() {
-  const canvas = canvasRef.value;
-  if (!canvas) return;
-
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = canvas.clientWidth * dpr;
-  canvas.height = canvas.clientHeight * dpr;
-  ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-
-function initParticles() {
-  const canvas = canvasRef.value;
-  if (!canvas) return;
-
-  const area = canvas.clientWidth * canvas.clientHeight;
-  const count = Math.min(42, Math.max(16, Math.floor(area / 22000)));
-
-  particles = Array.from({ length: count }, () => ({
-    x: Math.random() * canvas.clientWidth,
-    y: Math.random() * canvas.clientHeight,
-    vx: (Math.random() - 0.5) * 0.16,
-    vy: (Math.random() - 0.5) * 0.16,
-    r: Math.random() * 1.2 + 0.5,
-  }));
-}
-
-function step() {
-  const canvas = canvasRef.value;
-  if (!canvas || !ctx) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-  ctx.clearRect(0, 0, width, height);
-
-  for (const p of particles) {
-    p.x += p.vx;
-    p.y += p.vy;
-    if (p.x < -10 || p.x > width + 10) p.vx *= -1;
-    if (p.y < -10 || p.y > height + 10) p.vy *= -1;
-
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.20)';
-    ctx.fill();
-  }
-
-  for (let i = 0; i < particles.length; i++) {
-    for (let j = i + 1; j < particles.length; j++) {
-      const a = particles[i];
-      const b = particles[j];
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const maxDist = 110;
-
-      if (dist < maxDist) {
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.strokeStyle = `rgba(255,255,255,${0.045 * (1 - dist / maxDist)})`;
-        ctx.lineWidth = 0.7;
-        ctx.stroke();
-      }
-    }
-  }
-
-  animationFrame = requestAnimationFrame(step);
-}
-
-function handleResize() {
-  resizeCanvas();
-  initParticles();
-}
-
-onMounted(() => {
-  const canvas = canvasRef.value;
-  if (canvas) {
-    ctx = canvas.getContext('2d');
-    resizeCanvas();
-    initParticles();
-    step();
-  }
-  window.addEventListener('resize', handleResize);
-});
-
-onBeforeUnmount(() => {
-  cancelAnimationFrame(animationFrame);
-  window.removeEventListener('resize', handleResize);
-});
-
 </script>
 
 <template>
@@ -224,12 +120,6 @@ onBeforeUnmount(() => {
 
         <div
           class="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(135,135,135,0.20),transparent_34%),radial-gradient(circle_at_80%_85%,rgba(255,255,255,0.06),transparent_32%),linear-gradient(145deg,#363635_0%,#252524_55%,#1e1e1d_100%)]"
-        />
-
-        <canvas
-          ref="canvasRef"
-          class="pointer-events-none absolute inset-0 h-full w-full"
-          aria-hidden="true"
         />
 
         <div
@@ -345,7 +235,7 @@ onBeforeUnmount(() => {
           <!-- Login -->
 
           <div
-            class="animate-login rounded-[28px] border border-black/[0.055] bg-white p-7 shadow-[0_24px_80px_rgba(0,0,0,0.08)] sm:p-9"
+            class="rounded-[28px] border border-black/[0.055] bg-white p-7 shadow-[0_24px_80px_rgba(0,0,0,0.08)] sm:p-9"
           >
             <!-- Heading -->
 
@@ -393,11 +283,11 @@ onBeforeUnmount(() => {
                 </span>
 
                 <div
-                  class="group flex h-[52px] items-center gap-3 rounded-2xl border bg-[#fafafa] px-4 transition-all duration-200"
+                  class="group flex h-[52px] items-center gap-3 rounded-2xl border bg-[#fafafa] px-4 [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)]"
                   :class="
                     error
                       ? 'border-[#575756] bg-[#eeeeed]'
-                      : 'border-[#e4e4e3] hover:border-[#cfcfce]'
+                      : 'border-[#e4e4e3] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce]'
                   "
                 >
                   <Mail
@@ -431,11 +321,11 @@ onBeforeUnmount(() => {
                 </span>
 
                 <div
-                  class="group flex h-[52px] items-center gap-3 rounded-2xl border bg-[#fafafa] px-4 transition-all duration-200"
+                  class="group flex h-[52px] items-center gap-3 rounded-2xl border bg-[#fafafa] px-4 [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)]"
                   :class="
                     error
                       ? 'border-[#575756] bg-[#eeeeed]'
-                      : 'border-[#e4e4e3] hover:border-[#cfcfce]'
+                      : 'border-[#e4e4e3] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce]'
                   "
                 >
                   <Lock
@@ -467,7 +357,7 @@ onBeforeUnmount(() => {
                         ? 'Ocultar contraseña'
                         : 'Mostrar contraseña'
                     "
-                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#a0a09f] transition hover:bg-black/[0.04] hover:text-[#444443] disabled:pointer-events-none"
+                    class="page-control page-press flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#a0a09f] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-black/[0.04] [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#444443] disabled:pointer-events-none"
                   >
                     <EyeOff
                       v-if="showPassword"
@@ -495,7 +385,7 @@ onBeforeUnmount(() => {
               </label>
 
               <div class="-mt-2 text-right">
-                <button type="button" :disabled="loading" class="text-xs font-semibold text-[#575756] underline decoration-[#c7c7c6] underline-offset-4 transition hover:text-[#292928] disabled:opacity-50" @click="emit('go-forgot')">
+                <button type="button" :disabled="loading" class="page-control page-press text-xs font-semibold text-[#575756] underline decoration-[#c7c7c6] underline-offset-4 [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#292928] disabled:opacity-50" @click="emit('go-forgot')">
                   ¿Olvidaste tu contraseña?
                 </button>
               </div>
@@ -511,7 +401,7 @@ onBeforeUnmount(() => {
               <button
                 type="submit"
                 :disabled="loading"
-                class="group relative flex h-[54px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-[#292928] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(41,41,40,0.16)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1f1f1e] hover:shadow-[0_14px_30px_rgba(41,41,40,0.2)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                class="page-control page-press group relative flex h-[54px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-[#292928] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(41,41,40,0.16)] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#1f1f1e] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Loader2
                   v-if="loading"
@@ -543,7 +433,7 @@ onBeforeUnmount(() => {
                 type="button"
                 :disabled="loading"
                 @click="emit('go-register')"
-                class="group flex w-full items-center justify-center gap-2.5 rounded-2xl border border-[#dededd] bg-white py-3.5 text-sm font-semibold text-[#444443] transition-all duration-200 hover:border-[#bdbdbc] hover:bg-[#fafafa] hover:text-[#292928] disabled:pointer-events-none disabled:opacity-50"
+                class="page-control page-press group flex w-full items-center justify-center gap-2.5 rounded-2xl border border-[#dededd] bg-white py-3.5 text-sm font-semibold text-[#444443] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#bdbdbc] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#fafafa] [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#292928] disabled:pointer-events-none disabled:opacity-50"
               >
                 <UserPlus
                   :size="17"
@@ -590,25 +480,13 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@keyframes login-in {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.985);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 .login-input:-webkit-autofill,
 .login-input:-webkit-autofill:hover,
 .login-input:-webkit-autofill:focus {
   -webkit-text-fill-color: #292928;
   caret-color: #292928;
   box-shadow: 0 0 0 1000px transparent inset;
-  transition: background-color 9999s ease-out 0s;
+  transition: background-color 150ms var(--ease-out);
 }
 
 .login-input,
@@ -622,10 +500,6 @@ onBeforeUnmount(() => {
   outline-offset: 0 !important;
   box-shadow: none !important;
   background: transparent !important;
-}
-
-.animate-login {
-  animation: login-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .fade-enter-active,
@@ -642,10 +516,6 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-login {
-    animation: none;
-  }
-
   .fade-enter-active,
   .fade-leave-active {
     transition: none;

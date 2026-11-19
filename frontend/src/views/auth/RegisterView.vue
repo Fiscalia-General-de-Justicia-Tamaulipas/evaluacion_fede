@@ -481,11 +481,10 @@ async function onSubmit() {
           type="button"
           :disabled="loading"
           @click="emit('go-login')"
-          class="group inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-[#777776] transition hover:bg-black/[0.035] hover:text-[#292928] disabled:opacity-50"
+          class="page-control page-press group inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-[#777776] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-black/[0.035] [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#292928] disabled:opacity-50"
         >
           <ArrowLeft
             :size="15"
-            class="transition-transform group-hover:-translate-x-0.5"
           />
           Volver a iniciar sesión
         </button>
@@ -529,7 +528,7 @@ async function onSubmit() {
 
         <!-- Card -->
         <div
-          class="animate-register overflow-hidden rounded-[28px] border border-black/[0.055] bg-white shadow-[0_24px_80px_rgba(0,0,0,0.08)]"
+          class="overflow-hidden rounded-[28px] border border-black/[0.055] bg-white shadow-[0_24px_80px_rgba(0,0,0,0.08)]"
         >
           <form
             class="p-6 sm:p-8 lg:p-10"
@@ -567,7 +566,7 @@ async function onSubmit() {
                     placeholder="Ingresa tu nombre"
                     :disabled="loading"
                     @input="clearError"
-                    class="h-[52px] w-full rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 text-sm font-medium text-[#292928] outline-none transition-all placeholder:text-[#b8b8b7] hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
+                    class="h-[52px] w-full rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 text-sm font-medium text-[#292928] outline-none transition-colors placeholder:text-[#b8b8b7] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </label>
 
@@ -584,7 +583,7 @@ async function onSubmit() {
                       placeholder="Apellido paterno"
                       :disabled="loading"
                       @input="clearError"
-                      class="h-[52px] w-full rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 text-sm font-medium text-[#292928] outline-none transition-all placeholder:text-[#b8b8b7] hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
+                      class="h-[52px] w-full rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 text-sm font-medium text-[#292928] outline-none transition-colors placeholder:text-[#b8b8b7] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </label>
 
@@ -599,7 +598,7 @@ async function onSubmit() {
                       placeholder="Apellido materno"
                       :disabled="loading"
                       @input="clearError"
-                      class="h-[52px] w-full rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 text-sm font-medium text-[#292928] outline-none transition-all placeholder:text-[#b8b8b7] hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
+                      class="h-[52px] w-full rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 text-sm font-medium text-[#292928] outline-none transition-colors placeholder:text-[#b8b8b7] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </label>
                 </div>
@@ -632,7 +631,7 @@ async function onSubmit() {
                     Correo electrónico personal
                   </span>
                   <div
-                    class="group flex h-[52px] items-center gap-3 rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 transition-all duration-200 hover:border-[#cfcfce] focus-within:border-[#4a4a49] focus-within:bg-white focus-within:ring-4 focus-within:ring-black/[0.035]"
+                    class="group flex h-[52px] items-center gap-3 rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus-within:border-[#4a4a49] focus-within:bg-white focus-within:ring-4 focus-within:ring-black/[0.035]"
                   >
                     <Mail
                       :size="18"
@@ -658,7 +657,7 @@ async function onSubmit() {
                       Contraseña
                     </span>
                     <div
-                      class="group flex h-[52px] items-center gap-3 rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 transition-all duration-200 hover:border-[#cfcfce] focus-within:border-[#4a4a49] focus-within:bg-white focus-within:ring-4 focus-within:ring-black/[0.035]"
+                      class="group flex h-[52px] items-center gap-3 rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus-within:border-[#4a4a49] focus-within:bg-white focus-within:ring-4 focus-within:ring-black/[0.035]"
                     >
                       <Lock :size="18" class="shrink-0 text-[#a5a5a4]" />
                       <input
@@ -676,7 +675,7 @@ async function onSubmit() {
                         :disabled="loading"
                         @click="showPassword = !showPassword"
                         :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
-                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#a0a09f] transition hover:bg-black/[0.04] hover:text-[#444443]"
+                        class="page-control page-press flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#a0a09f] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-black/[0.04] [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#444443]"
                       >
                         <EyeOff v-if="showPassword" :size="18" />
                         <Eye v-else :size="18" />
@@ -689,7 +688,7 @@ async function onSubmit() {
                       Confirmar contraseña
                     </span>
                     <div
-                      class="group flex h-[52px] items-center gap-3 rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 transition-all duration-200 hover:border-[#cfcfce] focus-within:border-[#4a4a49] focus-within:bg-white focus-within:ring-4 focus-within:ring-black/[0.035]"
+                      class="group flex h-[52px] items-center gap-3 rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus-within:border-[#4a4a49] focus-within:bg-white focus-within:ring-4 focus-within:ring-black/[0.035]"
                     >
                       <Lock :size="18" class="shrink-0 text-[#a5a5a4]" />
                       <input
@@ -707,7 +706,7 @@ async function onSubmit() {
                         :disabled="loading"
                         @click="showConfirmPassword = !showConfirmPassword"
                         :aria-label="showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
-                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#a0a09f] transition hover:bg-black/[0.04] hover:text-[#444443]"
+                        class="page-control page-press flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#a0a09f] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-black/[0.04] [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#444443]"
                       >
                         <EyeOff v-if="showConfirmPassword" :size="18" />
                         <Eye v-else :size="18" />
@@ -751,7 +750,7 @@ async function onSubmit() {
               </div>
 
               <BaseAlert v-if="catalogError" class="mb-6" variant="destructive" title="No se pudieron cargar los datos de registro" :description="catalogError">
-                <template #action><button type="button" class="min-h-10 rounded-lg border border-[#a3a3a2] bg-white px-3 py-2 text-sm font-semibold hover:bg-[#f2f2f1]" @click="loadCatalogs">Reintentar</button></template>
+                <template #action><button type="button" class="page-control page-press min-h-10 rounded-lg border border-[#a3a3a2] bg-white px-3 py-2 text-sm font-semibold [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#f2f2f1]" @click="loadCatalogs">Reintentar</button></template>
               </BaseAlert>
 
               <div class="space-y-5">
@@ -771,7 +770,7 @@ async function onSubmit() {
                         v-model="form.institution_id"
                         required
                         :disabled="loading || loadingCatalogs"
-                        class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-all hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
+                        class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <option :value="null" disabled>
                           Selecciona tu institución
@@ -796,7 +795,7 @@ async function onSubmit() {
                       CURP
                     </span>
                     <div
-                      class="group flex h-[52px] items-center gap-3 rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 transition-all duration-200 hover:border-[#cfcfce] focus-within:border-[#4a4a49] focus-within:bg-white focus-within:ring-4 focus-within:ring-black/[0.035]"
+                      class="group flex h-[52px] items-center gap-3 rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-4 [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus-within:border-[#4a4a49] focus-within:bg-white focus-within:ring-4 focus-within:ring-black/[0.035]"
                     >
                       <BadgeCheck
                         :size="18"
@@ -836,7 +835,7 @@ async function onSubmit() {
                       v-model="form.municipality_id"
                       required
                       :disabled="loading || loadingCatalogs"
-                      class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-all hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
+                      class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option :value="null" disabled>
                         Selecciona tu municipio
@@ -871,7 +870,7 @@ async function onSubmit() {
                         maxlength="150"
                         :disabled="loading"
                         placeholder="Escribe el municipio"
-                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm outline-none transition focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035]"
+                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035]"
                       />
                     </label>
 
@@ -885,7 +884,7 @@ async function onSubmit() {
                         maxlength="150"
                         :disabled="loading"
                         placeholder="Escribe el estado"
-                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm outline-none transition focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035]"
+                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035]"
                       />
                     </label>
                   </div>
@@ -906,7 +905,7 @@ async function onSubmit() {
                         v-model="form.gender_id"
                         required
                         :disabled="loading || loadingCatalogs"
-                        class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-all hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
+                        class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <option :value="null" disabled>
                           Selecciona tu género
@@ -939,7 +938,7 @@ async function onSubmit() {
                         v-model="form.age_range_id"
                         required
                         :disabled="loading || loadingCatalogs"
-                        class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-all hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
+                        class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <option :value="null" disabled>
                           Selecciona tu rango de edad
@@ -971,7 +970,7 @@ async function onSubmit() {
                       maxlength="100"
                       :disabled="loading"
                       placeholder="Escribe cómo te identificas"
-                      class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-[#fafafa] px-4 text-sm outline-none transition focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035]"
+                      class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-[#fafafa] px-4 text-sm outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035]"
                     />
                   </label>
                 </Transition>
@@ -991,7 +990,7 @@ async function onSubmit() {
                         v-model="form.occupation_id"
                         required
                         :disabled="loading || loadingCatalogs"
-                        class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-all hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
+                        class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <option :value="null" disabled>
                           Selecciona tu ocupación
@@ -1024,7 +1023,7 @@ async function onSubmit() {
                         v-model="form.sector_id"
                         required
                         :disabled="loading || loadingCatalogs"
-                        class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-all hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
+                        class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <option :value="null" disabled>
                           Selecciona una opción
@@ -1056,7 +1055,7 @@ async function onSubmit() {
                       maxlength="200"
                       :disabled="loading"
                       placeholder="Escribe tu ocupación"
-                      class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-[#fafafa] px-4 text-sm outline-none transition focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035]"
+                      class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-[#fafafa] px-4 text-sm outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035]"
                     />
                   </label>
                 </Transition>
@@ -1088,7 +1087,7 @@ async function onSubmit() {
                         v-model="form.indigenous_id"
                         required
                         :disabled="loading || loadingCatalogs"
-                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm font-medium outline-none transition focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035] disabled:opacity-50"
+                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm font-medium outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035] disabled:opacity-50"
                       >
                         <option :value="null" disabled>
                           Selecciona una opción
@@ -1111,7 +1110,7 @@ async function onSubmit() {
                         v-model="form.afro_mexican_id"
                         required
                         :disabled="loading || loadingCatalogs"
-                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm font-medium outline-none transition focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035] disabled:opacity-50"
+                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm font-medium outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035] disabled:opacity-50"
                       >
                         <option :value="null" disabled>
                           Selecciona una opción
@@ -1134,7 +1133,7 @@ async function onSubmit() {
                         v-model="form.disability_id"
                         required
                         :disabled="loading || loadingCatalogs"
-                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm font-medium outline-none transition focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035] disabled:opacity-50"
+                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm font-medium outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035] disabled:opacity-50"
                       >
                         <option :value="null" disabled>
                           Selecciona una opción
@@ -1157,7 +1156,7 @@ async function onSubmit() {
                         v-model="form.lgbtttiq_id"
                         required
                         :disabled="loading || loadingCatalogs"
-                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm font-medium outline-none transition focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035] disabled:opacity-50"
+                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm font-medium outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035] disabled:opacity-50"
                       >
                         <option :value="null" disabled>
                           Selecciona una opción
@@ -1188,7 +1187,7 @@ async function onSubmit() {
                       v-model="form.education_level_id"
                       required
                       :disabled="loading || loadingCatalogs"
-                      class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-all hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
+                      class="h-[52px] w-full appearance-none rounded-2xl border border-[#e4e4e3] bg-[#fafafa] px-11 pr-10 text-sm font-medium text-[#292928] outline-none transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#cfcfce] focus:border-[#4a4a49] focus:bg-white focus:ring-4 focus:ring-black/[0.035] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option :value="null" disabled>
                         Selecciona tu grado de estudios
@@ -1220,7 +1219,7 @@ async function onSubmit() {
               <button
                 type="submit"
                 :disabled="loading || loadingCatalogs"
-                class="group relative flex h-[54px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-[#292928] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(41,41,40,0.16)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1f1f1e] hover:shadow-[0_14px_30px_rgba(41,41,40,0.2)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                class="page-control page-press group relative flex h-[54px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-[#292928] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(41,41,40,0.16)] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#1f1f1e] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Loader2
                   v-if="loading"
@@ -1231,7 +1230,7 @@ async function onSubmit() {
                   v-else
                   :size="18"
                   stroke-width="1.9"
-                  class="relative transition-transform duration-200 group-hover:-translate-y-0.5"
+                  class="relative"
                 />
 
                 <span class="relative">
@@ -1247,7 +1246,7 @@ async function onSubmit() {
                 <ArrowRight
                   v-if="!loading && !loadingCatalogs"
                   :size="16"
-                  class="relative opacity-50 transition-transform duration-200 group-hover:translate-x-0.5"
+                  class="relative opacity-50"
                 />
               </button>
             </div>
@@ -1273,7 +1272,7 @@ async function onSubmit() {
               type="button"
               :disabled="loading"
               @click="emit('go-login')"
-              class="mt-1.5 inline-flex items-center gap-1.5 text-sm font-semibold text-[#444443] transition hover:text-[#292928] disabled:opacity-50"
+              class="page-control page-press mt-1.5 inline-flex items-center gap-1.5 text-sm font-semibold text-[#444443] [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#292928] disabled:opacity-50"
             >
               Iniciar sesión
               <ArrowRight :size="14" />
@@ -1295,22 +1294,6 @@ async function onSubmit() {
 </template>
 
 <style scoped>
-@keyframes register-in {
-  from {
-    opacity: 0;
-    transform: translateY(18px) scale(0.985);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.animate-register {
-  animation: register-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
 .fade-enter-active,
 .fade-leave-active {
   transition:
@@ -1325,10 +1308,6 @@ async function onSubmit() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-register {
-    animation: none;
-  }
-
   .fade-enter-active,
   .fade-leave-active {
     transition: none;

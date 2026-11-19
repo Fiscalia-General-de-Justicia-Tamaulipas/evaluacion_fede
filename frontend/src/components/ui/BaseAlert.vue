@@ -55,7 +55,7 @@ const icons = { default: Info, info: Info, destructive: AlertCircle, success: Ch
         <slot name="action" />
       </div>
     </div>
-    <button v-if="floating" type="button" aria-label="Cerrar aviso" class="rounded-md p-1 opacity-70 hover:opacity-100 focus-visible:outline focus-visible:outline-2" @click="visible = false"><X :size="17" /></button>
+    <button v-if="floating" type="button" aria-label="Cerrar aviso" class="alert-close rounded-md p-1 opacity-70 focus-visible:outline focus-visible:outline-2" @click="visible = false"><X :size="17" /></button>
     </div>
   </div>
   </Transition>
@@ -82,3 +82,33 @@ const icons = { default: Info, info: Info, destructive: AlertCircle, success: Ch
     </div>
   </div>
 </template>
+
+<style scoped>
+.alert-toast-enter-active,
+.alert-toast-leave-active {
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+
+.alert-toast-leave-active { transition-duration: 140ms; }
+
+.alert-toast-enter-from,
+.alert-toast-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.alert-close { transition: opacity 150ms var(--ease-out); }
+
+@media (hover: hover) and (pointer: fine) {
+  .alert-close:hover { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alert-toast-enter-active,
+  .alert-toast-leave-active,
+  .alert-close { transition-duration: 120ms !important; }
+
+  .alert-toast-enter-from,
+  .alert-toast-leave-to { transform: none; }
+}
+</style>

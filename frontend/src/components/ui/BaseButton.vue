@@ -12,14 +12,61 @@ withDefaults(defineProps<{
   <button
     :type="type"
     :disabled="$attrs.disabled || loading"
-    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-[background-color,border-color,color,transform] duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#575756] disabled:cursor-not-allowed disabled:opacity-55"
+    class="base-button inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
     :class="{
-      'bg-[#292928] text-white hover:-translate-y-0.5 hover:bg-[#444443]': variant === 'primary',
-      'border border-[#c7c7c6] bg-white text-[#292928] hover:bg-[#f2f2f1]': variant === 'secondary',
-      'text-[#444443] hover:bg-[#eeeeed]': variant === 'quiet',
+      'base-button--primary': variant === 'primary',
+      'base-button--secondary': variant === 'secondary',
+      'base-button--quiet': variant === 'quiet',
     }"
+    :aria-busy="loading || undefined"
   >
-    <LoaderCircle v-if="loading" :size="16" class="animate-spin" aria-hidden="true" />
+    <LoaderCircle v-if="loading" :size="16" class="base-button__spinner" aria-hidden="true" />
     <slot />
   </button>
 </template>
+
+<style scoped>
+.base-button {
+  border: 1px solid transparent;
+  line-height: 1.25;
+  transition: color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
+}
+
+.base-button--primary {
+  background: var(--color-brand-900);
+  color: #fff;
+}
+
+.base-button--secondary {
+  border-color: var(--color-brand-700);
+  background: var(--color-surface);
+  color: var(--color-brand-900);
+}
+
+.base-button--quiet {
+  color: var(--color-brand-900);
+}
+
+.base-button:active:not(:disabled) {
+  box-shadow: inset 0 0 0 999px rgb(0 0 0 / 8%);
+}
+
+.base-button__spinner {
+  animation: button-spin 900ms linear infinite;
+}
+
+@keyframes button-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .base-button--primary:hover:not(:disabled) { background: var(--color-brand-800); }
+  .base-button--secondary:hover:not(:disabled) { background: var(--color-brand-100); }
+  .base-button--quiet:hover:not(:disabled) { background: var(--color-brand-100); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .base-button { transition: none; }
+  .base-button__spinner { animation-duration: 1800ms; }
+}
+</style>

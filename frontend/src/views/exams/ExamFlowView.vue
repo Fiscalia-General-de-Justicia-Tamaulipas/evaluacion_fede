@@ -1238,7 +1238,7 @@ onUnmounted(() => {
 
 <template>
 
-    <div class="min-h-screen bg-[#f4f4f3] text-[#575756]">
+    <div class="min-h-screen bg-[var(--color-paper)] text-[var(--color-ink)]">
 
         <!-- =====================================================
              HEADER
@@ -1259,9 +1259,7 @@ onUnmounted(() => {
              PDF SIDEBAR DERECHO
         ====================================================== -->
 
-        <Transition name="docs-fab">
-
-            <div v-if="showDocsMenu" ref="docsMenuRef" class="fixed right-0 top-1/2 z-40
+        <div v-if="showDocsMenu" ref="docsMenuRef" class="docs-drawer fixed right-0 top-1/2 z-40
                        -translate-y-1/2">
 
                 <div class="relative flex items-stretch" @mouseenter="openDocsMenu" @mouseleave="closeDocsMenu">
@@ -1270,7 +1268,7 @@ onUnmounted(() => {
                          PESTAÑA
                     ================================================== -->
 
-                    <button type="button" @click.stop="toggleDocsMenu" title="Documentos de apoyo" class="relative z-20 flex h-80 w-11
+                    <button type="button" @click.stop="toggleDocsMenu" title="Documentos de apoyo" aria-label="Abrir documentos de apoyo" :aria-expanded="docsMenuOpen" class="docs-drawer__tab page-control relative z-20 flex h-80 w-11
                                cursor-pointer items-center
                                justify-center
                                rounded-l-2xl
@@ -1279,18 +1277,19 @@ onUnmounted(() => {
                                bg-white
                                text-[#575756]
                                shadow-[0_8px_30px_rgba(0,0,0,0.08)]
-                               transition-all duration-300
-                               hover:bg-[#575756]
-                               hover:text-white
-                               hover:shadow-[0_8px_30px_rgba(0,0,0,0.18)]
-                               focus:outline-none
-                               focus:ring-2
-                               focus:ring-[#878787]/40">
+                               ease-[var(--ease-out)]
+                               [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#575756]
+                               [@media(hover:hover)_and_(pointer:fine)]:hover:text-white
+                               [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-[0_8px_30px_rgba(0,0,0,0.18)]
+                               focus-visible:outline
+                               focus-visible:outline-3
+                               focus-visible:outline-offset-2
+                               focus-visible:outline-[var(--color-focus)]">
 
                         <div class="flex flex-col
                                    items-center gap-1.5">
 
-                            <FileText :size="18" />
+                            <FileText :size="18" aria-hidden="true" />
 
                             <span class="text-[14px]
                                        font-bold
@@ -1312,10 +1311,10 @@ onUnmounted(() => {
 
                     <Transition name="docs-panel">
 
-                        <div v-if="docsMenuOpen" class="absolute right-11 top-1/2
+                        <div v-if="docsMenuOpen" class="docs-drawer__panel absolute right-11 top-1/2
                                    -translate-y-1/2">
 
-                            <aside class="w-[360px]
+                            <aside class="docs-drawer__surface w-[360px]
                                        overflow-hidden
                                        rounded-l-2xl
                                        border border-r-0
@@ -1329,7 +1328,7 @@ onUnmounted(() => {
                                            justify-between
                                            border-b
                                            border-[#dadada]
-                                           bg-[#3f3f3e]
+                                           bg-[var(--color-brand-800)]
                                            px-4 py-3.5
                                            text-white">
 
@@ -1343,7 +1342,7 @@ onUnmounted(() => {
                                                    ring-1
                                                    ring-white/15">
 
-                                            <FileText :size="17" />
+                                            <FileText :size="17" aria-hidden="true" />
 
                                         </div>
 
@@ -1357,7 +1356,7 @@ onUnmounted(() => {
                                             </p>
 
                                             <p class="text-[10px]
-                                                       text-white/60
+                                                       text-white/75
                                                        leading-tight
                                                        mt-0.5">
                                                 Material de consulta
@@ -1391,17 +1390,18 @@ onUnmounted(() => {
                                            [scrollbar-color:#dadada_transparent]">
 
                                     <button v-for="doc in supportDocuments" :key="doc.id" type="button"
-                                        @click="openDocument(doc)" class="group/doc flex w-full
+                                        @click="openDocument(doc)" class="page-control group/doc flex w-full
                                                items-center gap-3
                                                rounded-xl p-2
                                                text-left
-                                               transition-all
-                                               duration-200
-                                               hover:bg-[#f4f4f3]
-                                               hover:shadow-sm
-                                               focus:outline-none
-                                               focus:ring-2
-                                               focus:ring-[#878787]/30">
+                                               transition-colors
+                                               duration-200 ease-[var(--ease-out)]
+                                               [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#f4f4f3]
+                                               [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-sm
+                                               focus-visible:outline
+                                               focus-visible:outline-3
+                                               focus-visible:outline-offset-2
+                                               focus-visible:outline-[var(--color-focus)]">
 
                                         <!-- MINIATURA -->
 
@@ -1415,8 +1415,8 @@ onUnmounted(() => {
                                                    border-[#dadada]
                                                    bg-[#f4f4f3]
                                                    shadow-sm
-                                                   transition-all
-                                                   duration-200
+                                                   transition-colors
+                                                   duration-200 ease-[var(--ease-out)]
                                                    group-hover/doc:border-[#878787]
                                                    group-hover/doc:shadow-md">
 
@@ -1428,7 +1428,7 @@ onUnmounted(() => {
                                                        w-full
                                                        object-cover" />
 
-                                            <FileText v-else :size="18" class="text-[#878787]" />
+                                            <FileText v-else :size="18" aria-hidden="true" class="text-[var(--color-brand-700)]" />
 
                                         </span>
 
@@ -1452,9 +1452,9 @@ onUnmounted(() => {
                                                        gap-1
                                                        text-[10px]
                                                        font-semibold
-                                                       text-[#878787]">
+                                                       text-[var(--color-muted)]">
 
-                                                <FileText :size="11" />
+                                                <FileText :size="11" aria-hidden="true" />
 
                                                 Consultar documento
 
@@ -1465,12 +1465,11 @@ onUnmounted(() => {
 
                                         <!-- FLECHA -->
 
-                                        <ChevronRight :size="15" class="shrink-0
-                                                   text-[#b0b0b0]
-                                                   transition-all
-                                                   duration-200
-                                                   group-hover/doc:translate-x-0.5
-                                                   group-hover/doc:text-[#575756]" />
+                                                    <ChevronRight :size="15" class="shrink-0
+                                                   text-[var(--color-brand-700)]
+                                                   transition-colors
+                                                   duration-200 ease-[var(--ease-out)]
+                                                   group-hover/doc:text-[var(--color-brand-900)]" aria-hidden="true" />
 
                                     </button>
 
@@ -1486,15 +1485,13 @@ onUnmounted(() => {
 
             </div>
 
-        </Transition>
-
 
         <!-- =====================================================
              MAIN
         ====================================================== -->
 
-        <main id="main-content" tabindex="-1" class="mx-auto max-w-6xl
-                   px-5 py-8 md:py-6">
+        <main id="main-content" tabindex="-1" class="mx-auto w-full max-w-6xl
+                   px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
 
             <BaseAlert v-if="message && stage !== 'result'" floating variant="destructive" title="No se pudo guardar o completar la acción" :description="message" />
 
@@ -1502,76 +1499,39 @@ onUnmounted(() => {
                  INTRO
             ==================================================== -->
 
-            <section v-if="stage === 'intro'" class="flex flex-col items-center">
+            <section v-if="stage === 'intro'" class="mx-auto max-w-4xl">
 
-                <div class="mx-auto max-w-4xl text-center">
+                <div class="mx-auto rounded-[var(--radius-card)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-card)] sm:p-8 lg:p-10">
 
-                    <span class="inline-flex items-center gap-2
-                               rounded-full
-                               bg-[#dadada]/60
-                               px-3 py-1
-                               text-xs
-                               font-semibold
-                               uppercase
-                               tracking-wider">
+                    <span class="inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-accent)]">
 
-                        <PlayCircle :size="14" />
+                        <PlayCircle :size="18" aria-hidden="true" />
 
-                        Material introductorio
+                        Material introductorio · Módulo 1
 
                     </span>
 
 
-                    <h2 class="mt-5 text-4xl
-                               font-black
-                               tracking-tight
-                               md:text-5xl
-                               lg:text-4xl">
+                    <h1 class="mt-4 max-w-3xl text-2xl font-bold leading-tight tracking-tight text-[var(--color-brand-950)] sm:text-3xl lg:text-4xl">
+                        Nociones básicas de derecho electoral
 
-                        Delitos Electorales y su investigación
-                        en el contexto de los Procesos Electorales
-                        Locales.
-
-                    </h2>
+                    </h1>
 
 
-                    <p class="mx-auto mt-5 max-w-3xl
-                               text-base
-                               leading-7
-                               text-[#878787]
-                               md:text-lg">
-
-                        Visualiza el material completo antes de
-                        acceder a la evaluación del
-
-                        <br />
-
-                        <b>
-                            Módulo 1: Nociones básicas de derecho electoral.
-                        </b>
+                    <p class="mt-4 max-w-2xl text-base leading-7 text-[var(--color-muted)]">
+                        Revisa el material del curso antes de iniciar la evaluación. El video debe completarse para habilitar las preguntas.
 
                     </p>
 
 
-                    <div class="mt-7 flex items-center
-                               justify-center gap-3
-                               text-sm text-[#878787]">
+                    <div class="mt-6 flex items-start gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] p-4">
 
-                        <LockKeyhole :size="17" />
+                        <LockKeyhole v-if="!videoDone" :size="19" class="mt-0.5 shrink-0 text-[var(--color-brand-700)]" aria-hidden="true" />
+                        <CheckCircle2 v-else :size="19" class="mt-0.5 shrink-0 text-[var(--color-success)]" aria-hidden="true" />
 
-                        <span v-if="!videoDone">
+                        <p v-if="!videoDone" class="text-sm leading-6 text-[var(--color-brand-900)]">Completa el video para continuar. Tu avance se guardará al comenzar la evaluación.</p>
 
-                            La evaluación se habilita al
-                            concluir el video.
-
-                        </span>
-
-                        <span v-else class="font-bold text-[#575756]">
-
-                            Video completado.
-                            Ya puedes continuar con la evaluación.
-
-                        </span>
+                        <p v-else class="text-sm font-semibold leading-6 text-[var(--color-success)]">Video completado. Ya puedes continuar con la evaluación.</p>
 
                     </div>
 
@@ -1582,59 +1542,59 @@ onUnmounted(() => {
                      VIDEO
                 ================================================== -->
 
-                <div class="mt-8 flex w-full justify-center">
+                <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
 
                     <button
                         type="button"
-                        class="inline-flex items-center gap-3 rounded-2xl bg-[#575756] px-8 py-4 text-base font-black text-white shadow-xl shadow-black/10 transition hover:-translate-y-0.5 hover:bg-[#454544] hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-[#575756] focus:ring-offset-4"
+                        class="intro-primary page-control inline-flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-brand-900)] px-5 py-3 text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--color-brand-800)]"
                         aria-label="Ver video de capacitación"
                         @click="openVideoModal"
                     >
-                        <PlayCircle :size="23" />
-                        Ver video
+                        <PlayCircle :size="19" aria-hidden="true" />
+                        Ver video de capacitación
                     </button>
-
+                    <span class="text-sm leading-6 text-[var(--color-muted)]">La evaluación se desbloquea al finalizar la reproducción.</span>
                 </div>
 
 
-            <Transition name="fade">
+            <Transition name="modal-fade">
 
                 <div
                     v-if="videoModalOpen"
-                    class="fixed inset-0 z-[9999] flex min-h-screen flex-col overflow-y-auto bg-[#20201f] text-white"
+                    class="fixed inset-0 z-[9999] flex min-h-dvh flex-col overflow-y-auto bg-[#20201f] text-white"
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="video-modal-title"
                     @click.self="closeVideoModal"
                 >
-                    <div class="flex min-h-screen w-full flex-col">
+                    <div class="flex min-h-dvh w-full flex-col">
                         <header class="border-b border-white/10 bg-[#292928] px-5 py-4 md:px-10">
                             <div class="mx-auto flex max-w-7xl items-center gap-4">
                                 <button
                                     type="button"
                                     title="Regresar al panel de módulos"
                                     aria-label="Regresar al panel de módulos"
-                                    class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/15 text-white/75 transition hover:bg-white/10 hover:text-white"
+                                    class="page-control inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/30 text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-white/10"
                                     @click="emit('back')"
                                 >
-                                    <ArrowLeft :size="20" />
+                                    <ArrowLeft :size="20" aria-hidden="true" />
                                 </button>
                                 <img
                                     src="/logo_fgjtam.png"
                                     alt="Logo Fiscalía General de Justicia de Tamaulipas"
-                                    class="h-12 w-auto object-contain md:h-16"
+                                    class="h-9 w-auto max-w-[72px] object-contain sm:h-12 sm:max-w-none md:h-16"
                                 />
 
-                                <div class="h-10 w-px bg-white/20 md:h-12" />
+                                <div class="h-8 w-px shrink-0 bg-white/40 sm:h-10 md:h-12" />
 
                                 <img
                                     src="/logo_fede.png"
                                     alt="Logo Fiscalía Especializada en Delitos Electorales"
-                                    class="h-12 w-auto object-contain md:h-16"
+                                    class="h-9 w-auto max-w-[72px] object-contain sm:h-12 sm:max-w-none md:h-16"
                                 />
 
                                 <div class="ml-auto min-w-0 pr-10">
-                                    <p class="truncate text-xs font-bold uppercase tracking-[0.18em] text-white/55">
+                                    <p class="hidden truncate text-xs font-bold uppercase tracking-[0.18em] text-white/75 sm:block">
                                         Material introductorio
                                     </p>
                                     <h2 id="video-modal-title" class="mt-1 text-sm font-black text-white md:text-lg">
@@ -1646,20 +1606,20 @@ onUnmounted(() => {
                                 type="button"
                                 title="Cerrar video"
                                 aria-label="Cerrar video"
-                                class="absolute right-5 top-5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/65 transition hover:bg-white/10 hover:text-white md:right-10"
+                                class="page-control absolute right-3 top-3 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white sm:right-5 sm:top-5 md:right-10"
                                 @click="closeVideoModal"
                             >
-                                <X :size="20" />
+                                <X :size="20" aria-hidden="true" />
                             </button>
                             </div>
                         </header>
 
                         <main class="flex flex-1 flex-col items-center justify-center px-4 py-8 md:px-10 md:py-12">
-                            <div class="mb-6 text-center md:mb-8">
-                                <p class="text-2xl font-black md:text-4xl">
+                            <div class="mb-6 w-full max-w-6xl text-left md:mb-8">
+                                <p class="text-xl font-bold leading-tight md:text-3xl">
                                     Módulo 1: Nociones básicas de derecho electoral
                                 </p>
-                                <p class="mt-2 text-sm text-white/60 md:text-base">
+                                <p class="mt-2 text-sm leading-6 text-white/75 md:text-base">
                                     Reproduce el video completo antes de contestar la evaluación.
                                 </p>
                             </div>
@@ -1679,8 +1639,8 @@ onUnmounted(() => {
                             </video>
                             </div>
 
-                            <div class="mt-6 flex w-full max-w-6xl flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 sm:flex-row">
-                                <p class="text-sm text-white/60">
+                            <div class="mt-6 flex w-full max-w-6xl flex-col items-stretch justify-between gap-4 border-t border-white/15 pt-6 sm:flex-row sm:items-center">
+                                <p class="text-sm leading-6 text-white/75">
                                     <span v-if="!videoDone">La evaluación se habilita al terminar el video.</span>
                                     <span v-else class="font-bold text-white">Video completado. Ya puedes continuar.</span>
                                 </p>
@@ -1688,7 +1648,7 @@ onUnmounted(() => {
                                 <button
                                     type="button"
                                     :disabled="!videoDone || loading"
-                                    class="rounded-xl bg-white px-6 py-3 text-sm font-black text-[#292928] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+                                    class="page-control min-h-12 rounded-[var(--radius-control)] bg-white px-6 py-3 text-sm font-semibold text-[#202020] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eeeeed] disabled:cursor-not-allowed disabled:opacity-50"
                                     @click="startExam"
                                 >
                                     {{ loading ? 'Preparando evaluación…' : 'Contestar evaluación' }}
@@ -1711,106 +1671,73 @@ onUnmounted(() => {
 
                 <!-- HEADER -->
 
-                <div class="mb-5 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+                <header class="rounded-[var(--radius-card)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)] sm:p-6">
 
-                    <div>
+                    <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
 
-                        <p class="text-xs
-                                   font-bold
-                                   uppercase
-                                   tracking-widest
-                                   text-[#878787]">
-                            Módulo 1
-                        </p>
-
-                        <h2 class="max-w-2xl text-lg font-black leading-snug text-[#575756] md:text-xl">
+                        <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold text-[var(--color-accent)]">Módulo 1 · Evaluación</p>
+                        <h1 class="mt-1 max-w-2xl text-lg font-bold leading-6 text-[var(--color-brand-950)] sm:text-xl">
                             Nociones básicas de derecho electoral
-                        </h2>
+                        </h1>
+                        </div>
 
+                        <p class="shrink-0 rounded-lg bg-[var(--color-paper)] px-3 py-2 text-sm font-semibold tabular-nums text-[var(--color-brand-900)]">
+                            Pregunta {{ current + 1 }} de {{ questions.length }}
+                        </p>
                     </div>
 
-
-                    <div class="text-right">
-
-                        <p class="text-sm font-bold">
-                            {{ current + 1 }}
-                            /
-                            {{ questions.length }}
-                        </p>
-
-                        <p class="text-xs text-[#878787]">
-                            Preguntas contestadas: {{ answeredCount }}
-                        </p>
-
+                    <div class="mt-5 flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <span class="font-medium text-[var(--color-brand-900)]">{{ answeredCount }} de {{ questions.length }} contestadas</span>
+                      <span class="text-[var(--color-muted)]">Avance: {{ Math.round(progress) }}%</span>
                     </div>
-
-                </div>
-
-
-                <!-- PROGRESS -->
-
-                <div class="h-2 overflow-hidden
-                           rounded-full
-                           bg-[#dadada]">
-
-                    <div class="h-full
-                               rounded-full
-                               bg-[#575756]
-                               transition-all
-                               duration-500" :style="{
-                                width: progress + '%'
-                            }" />
-
-                </div>
+                    <div class="mt-2 h-2.5 overflow-hidden rounded-full bg-[var(--color-brand-100)]" role="progressbar" :aria-valuenow="answeredCount" aria-valuemin="0" :aria-valuemax="questions.length" :aria-valuetext="`${answeredCount} de ${questions.length} preguntas contestadas`" aria-label="Avance de la evaluación">
+                      <div class="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-200" :style="{ width: progress + '%' }" />
+                    </div>
+                </header>
 
 
                 <!-- QUESTION CARD -->
 
-                <div v-if="q" class="mt-8 h-[min(640px,60vh)] min-h-[480px] overflow-y-auto rounded-3xl
-                           border border-[#dadada]
-                           bg-white p-6
-                           shadow-xl
-                           shadow-black/5
-                           md:p-10">
-
-                    <Transition name="fade" mode="out-in">
+                <article v-if="q" class="mt-4 rounded-[var(--radius-card)] border border-[var(--color-line)]
+                           bg-[var(--color-surface)] p-5 shadow-[var(--shadow-card)] sm:mt-6 sm:p-8 lg:p-10">
 
                         <div :key="q.id">
 
                             <!-- QUESTION -->
 
-                            <div class="flex items-start
-                                       gap-4">
+                            <div class="flex items-start gap-3 sm:gap-4">
 
-                                <span class="flex h-10 w-10
+                                <span aria-hidden="true" class="flex h-10 w-10
                                            shrink-0
                                            items-center
                                            justify-center
                                            rounded-xl
-                                           bg-[#575756]
+                                           bg-[var(--color-brand-900)]
                                            text-sm
-                                           font-black
+                                           font-bold
                                            text-white">
                                     {{ current + 1 }}
                                 </span>
 
 
-                                <h3 class="text-lg font-bold leading-7 md:text-xl md:leading-8">
+                                <h2 class="min-w-0 pt-1 text-lg font-semibold leading-7 text-[var(--color-brand-950)] sm:text-xl sm:leading-8">
                                     {{ q.text }}
-                                </h3>
+                                </h2>
 
                             </div>
 
 
                             <!-- OPTIONS -->
 
-                            <div class="mt-8 space-y-3">
+                            <fieldset class="mt-6 space-y-3 sm:mt-8" :aria-busy="savingAnswer">
+                                <legend class="sr-only">Selecciona una respuesta</legend>
 
-                                <button v-for="o in q.options" :key="o.id" type="button" :disabled="savingAnswer" @click="
+                                <button v-for="o in q.options" :key="o.id" type="button" :disabled="savingAnswer" :aria-pressed="answers[q.id] === o.id" @click="
                                     selectOption(o.id)
-                                    " class="group flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition disabled:opacity-60" :class="answers[q.id] === o.id
-                                                ? 'border-[#575756] bg-[#f0f0ef] shadow-sm'
-                                                : 'border-[#dadada] hover:border-[#878787] hover:bg-[#fafafa]'
+                                    " class="exam-option page-control group flex min-h-14 w-full items-start gap-3 rounded-xl border p-4 text-left text-base leading-6 disabled:cursor-wait disabled:opacity-60 sm:gap-4" :class="answers[q.id] === o.id
+                                                ? 'exam-option--selected'
+                                                : 'exam-option--idle'
                                             ">
 
                                     <span class="flex h-8 w-8
@@ -1820,73 +1747,67 @@ onUnmounted(() => {
                                                rounded-lg
                                                border
                                                text-sm
-                                               font-bold" :class="answers[q.id] === o.id
-                                                    ? 'border-[#575756] bg-[#575756] text-white'
-                                                    : 'border-[#dadada] text-[#878787]'
+                                               font-semibold" :class="answers[q.id] === o.id
+                                                    ? 'border-[var(--color-brand-900)] bg-[var(--color-brand-900)] text-white'
+                                                    : 'border-[var(--color-brand-700)] bg-white text-[var(--color-brand-900)]'
                                                 ">
                                         {{ o.letter.toUpperCase() }}
                                     </span>
 
 
-                                    <span class="pt-1
-                                               text-sm
-                                               leading-6
-                                               md:text-base">
+                                    <span class="min-w-0 flex-1 pt-0.5 text-[var(--color-brand-950)]">
                                         {{ o.text }}
                                     </span>
 
 
-                                    <CheckCircle2 v-if="answers[q.id] === o.id" aria-label="Opción seleccionada" class="ml-auto mt-1 shrink-0 text-green-700" :size="18" />
+                                    <CheckCircle2 v-if="answers[q.id] === o.id" aria-hidden="true" class="mt-1 shrink-0 text-[var(--color-success)]" :size="18" />
 
                                 </button>
 
-                            </div>
+                            </fieldset>
 
 
                             <!-- SAVE STATUS -->
 
-                            <div class="mt-4 flex justify-end">
-                                <span v-if="savingAnswer" role="status" aria-live="polite" class="text-xs font-medium text-[#575756]">Guardando respuesta…</span>
-                            </div>
+                            <p v-if="savingAnswer" role="status" aria-live="polite" class="mt-4 text-sm font-medium text-[var(--color-accent)]">Guardando respuesta…</p>
 
                         </div>
 
-                    </Transition>
 
 
                     <!-- NAVIGATION -->
 
-                </div>
+                </article>
 
-                <nav v-if="questions.length" aria-label="Paginación de preguntas" class="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <nav v-if="questions.length" aria-label="Navegación de preguntas" class="mt-4 flex flex-col gap-4 sm:mt-5">
 
-                    <button type="button" @click="previous" :disabled="current === 0 || savingAnswer" aria-label="Pregunta anterior" title="Pregunta anterior" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#dadada] bg-white text-[#575756] disabled:opacity-35">
-                        <ChevronLeft :size="18" />
-                    </button>
+                    <div role="group" aria-label="Ir a una pregunta" class="flex flex-wrap items-center justify-center gap-2">
 
-                    <div class="flex flex-1 flex-wrap items-center justify-center gap-2">
-
-                        <button v-for="(item, index) in questions" :key="item.id" type="button" @click="goToQuestion(index)" :disabled="index > maxReachableIndex || savingAnswer" :aria-label="`Pregunta ${index + 1}${answers[item.id] ? ', respondida' : ', pendiente'}`" :aria-current="index === current ? 'page' : undefined" :title="`Pregunta ${index + 1}`" class="h-9 w-9 rounded-lg border text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-35" :class="index === current
-                            ? 'border-[#575756] bg-[#575756] text-white'
-                            : answers[item.id]
-                                ? 'border-[#a3a3a2] bg-[#eeeeed] text-[#292928] hover:bg-[#e5e5e4]'
-                                : 'border-[#dadada] bg-white text-[#878787] hover:border-[#878787]'">
+                        <button v-for="(item, index) in questions" :key="item.id" type="button" @click="goToQuestion(index)" :disabled="index > maxReachableIndex || savingAnswer" :aria-label="`Pregunta ${index + 1}${answers[item.id] != null ? ', contestada' : ', pendiente'}`" :aria-current="index === current ? 'step' : undefined" class="question-index min-h-11 min-w-11 rounded-[var(--radius-control)] border px-2 text-sm font-semibold tabular-nums disabled:cursor-not-allowed disabled:opacity-50" :class="index === current
+                            ? 'question-index--current'
+                            : answers[item.id] != null
+                                ? 'question-index--answered'
+                                : 'question-index--pending'">
                             {{ index + 1 }}
                         </button>
 
                     </div>
 
-                    <button v-if="canNext" type="button" @click="next" :disabled="savingAnswer" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#575756] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#454544] disabled:cursor-not-allowed disabled:opacity-50">
-                        Siguiente pregunta
-                        <ChevronRight :size="18" />
-                    </button>
+                    <div class="flex flex-col-reverse gap-3 border-t border-[var(--color-line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <button type="button" @click="previous" :disabled="current === 0 || savingAnswer" aria-label="Pregunta anterior" class="page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-brand-700)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-brand-900)] disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--color-brand-100)]">
+                        <ChevronLeft :size="18" aria-hidden="true" /> Anterior
+                      </button>
 
-                    <button v-else-if="allAnswered && current === maxReachableIndex" type="button" @click="finish" :disabled="loading || savingAnswer" class="inline-flex items-center gap-2 rounded-lg bg-[#575756] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-35">
-                        {{ loading ? 'Guardando…' : 'Finalizar' }}
-                        <CheckCircle2 :size="18" />
-                    </button>
+                      <button v-if="canNext" type="button" @click="next" :disabled="savingAnswer" class="page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-brand-900)] px-5 py-2 text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--color-brand-800)] disabled:cursor-wait disabled:opacity-50">
+                        Siguiente pregunta <ChevronRight :size="18" aria-hidden="true" />
+                      </button>
 
-                    <span v-else class="h-10 w-10" aria-hidden="true" />
+                      <button v-else-if="allAnswered && current === maxReachableIndex" type="button" @click="finish" :disabled="loading || savingAnswer" class="page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-brand-900)] px-5 py-2 text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--color-brand-800)] disabled:cursor-wait disabled:opacity-50">
+                        {{ loading ? 'Finalizando…' : 'Finalizar evaluación' }} <CheckCircle2 :size="18" aria-hidden="true" />
+                      </button>
+
+                      <span v-else class="text-center text-sm text-[var(--color-muted)] sm:text-right">Selecciona una respuesta para avanzar.</span>
+                    </div>
 
                 </nav>
 
@@ -1920,7 +1841,7 @@ onUnmounted(() => {
                    px-5 pb-8
                    text-center
                    text-xs
-                   text-[#878787]">
+                   text-[var(--color-muted)]">
 
             Fiscalía General de Justicia
             del Estado de Tamaulipas
@@ -1937,7 +1858,7 @@ onUnmounted(() => {
              PDF VIEWER MODAL
         ====================================================== -->
 
-        <Transition name="fade">
+        <Transition name="modal-fade">
 
             <div v-if="viewingDoc" @click.self="closeViewer" class="fixed inset-0 z-50
                        flex items-center
@@ -1975,7 +1896,7 @@ onUnmounted(() => {
                                        bg-[#f0f0ef]
                                        text-[#575756]">
 
-                                <FileText :size="16" />
+                                <FileText :size="16" aria-hidden="true" />
 
                             </span>
 
@@ -1989,18 +1910,18 @@ onUnmounted(() => {
                         </div>
 
 
-                        <button @click="closeViewer" title="Cerrar" class="inline-flex
-                                   h-8 w-8
+                        <button @click="closeViewer" title="Cerrar" aria-label="Cerrar documento" class="page-control inline-flex
+                                   h-11 w-11
                                    shrink-0
                                    items-center
                                    justify-center
                                    rounded-lg
-                                   text-[#878787]
+                                   text-[var(--color-brand-700)]
                                    transition
-                                   hover:bg-[#f4f4f3]
-                                   hover:text-[#575756]">
+                                   [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#f4f4f3]
+                                   [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#575756]">
 
-                            <X :size="18" />
+                            <X :size="18" aria-hidden="true" />
 
                         </button>
 
@@ -2026,48 +1947,111 @@ onUnmounted(() => {
 
 
 <style scoped>
-/* =========================================================
-   FADE GENERAL
-   ========================================================= */
-
-.fade-enter-active,
-.fade-leave-active {
-
+.exam-option,
+.question-index {
     transition:
-        opacity 0.15s ease;
-
+        background-color var(--motion-fast) var(--ease-out),
+        border-color var(--motion-fast) var(--ease-out),
+        color var(--motion-fast) var(--ease-out),
+        box-shadow var(--motion-fast) var(--ease-out);
 }
 
-.fade-enter-from,
-.fade-leave-to {
+.exam-option--idle { border-color: var(--color-brand-700); background: var(--color-surface); }
+.exam-option--selected { border-color: var(--color-accent); background: var(--color-accent-soft); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.question-index--current { border-color: var(--color-brand-900); background: var(--color-brand-900); color: #fff; }
+.question-index--answered { border-color: var(--color-brand-700); background: var(--color-brand-100); color: var(--color-brand-900); }
+.question-index--pending { border-color: var(--color-brand-700); background: var(--color-surface); color: var(--color-brand-900); }
 
-    opacity: 0;
-
+@media (hover: hover) and (pointer: fine) {
+    .exam-option--idle:hover { border-color: var(--color-brand-700); background: var(--color-paper); }
+    .question-index--pending:hover { border-color: var(--color-brand-700); background: var(--color-paper); }
 }
 
-
-/* =========================================================
-   PDF SIDEBAR - PESTAÑA
-   ========================================================= */
-
-.docs-fab-enter-active,
-.docs-fab-leave-active {
-
+.docs-drawer__tab,
+.docs-drawer__panel,
+.docs-drawer__surface {
     transition:
-        opacity 0.3s ease,
-        transform 0.3s ease;
-
+        background-color var(--motion-fast) var(--ease-out),
+        border-color var(--motion-fast) var(--ease-out),
+        color var(--motion-fast) var(--ease-out),
+        box-shadow var(--motion-fast) var(--ease-out);
 }
 
-.docs-fab-enter-from,
-.docs-fab-leave-to {
+@media (max-width: 639px) {
+    .docs-drawer {
+        top: auto !important;
+        right: 12px !important;
+        bottom: 12px !important;
+        transform: none !important;
+    }
 
-    opacity: 0;
+    .docs-drawer__tab {
+        width: auto !important;
+        height: 48px !important;
+        padding: 0 14px !important;
+        gap: 8px !important;
+        border: 1px solid var(--color-brand-700) !important;
+        border-radius: 999px !important;
+        background: var(--color-surface) !important;
+        color: var(--color-brand-900) !important;
+        box-shadow: 0 4px 16px rgb(32 32 32 / 14%) !important;
+    }
 
-    transform:
-        translateX(40px) translateY(-50%);
+    .docs-drawer__tab > div { flex-direction: row !important; gap: 8px !important; }
+    .docs-drawer__tab span { writing-mode: horizontal-tb !important; font-size: 12px !important; letter-spacing: 0.02em !important; }
 
+    .docs-drawer__panel {
+        top: auto !important;
+        right: 0 !important;
+        bottom: 56px !important;
+        width: min(360px, calc(100vw - 24px)) !important;
+        transform: none !important;
+    }
+
+    .docs-drawer__surface {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        max-height: min(70dvh, 560px) !important;
+        border: 1px solid var(--color-line) !important;
+        border-radius: var(--radius-card) !important;
+        box-shadow: var(--shadow-dialog) !important;
+    }
+
+    .docs-drawer__surface > div:last-child {
+        max-height: calc(70dvh - 64px) !important;
+    }
 }
+
+.docs-panel-enter-active,
+.docs-panel-leave-active,
+.modal-fade-enter-active,
+.modal-fade-leave-active,
+.intro-primary {
+    transition-duration: var(--motion-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .exam-option,
+    .question-index,
+    .docs-drawer__tab,
+    .docs-drawer__panel,
+    .docs-drawer__surface,
+    .intro-primary {
+        transition: none !important;
+    }
+}
+
+/* One shared entrance per full-screen viewer; its content arrives with it. */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+    transition: opacity 180ms var(--ease-out);
+}
+
+.modal-fade-leave-active { transition-duration: 140ms; }
+
+.modal-fade-enter-from,
+.modal-fade-leave-to { opacity: 0; }
 
 
 /* =========================================================
@@ -2077,16 +2061,18 @@ onUnmounted(() => {
 .docs-panel-enter-active {
 
     transition:
-        opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        opacity 180ms var(--ease-out),
+        transform 180ms var(--ease-out);
+    transform-origin: right center;
 
 }
 
 .docs-panel-leave-active {
 
     transition:
-        opacity 0.15s ease,
-        transform 0.15s ease;
+        opacity 140ms var(--ease-out),
+        transform 140ms var(--ease-out);
+    transform-origin: right center;
 
 }
 
@@ -2095,8 +2081,25 @@ onUnmounted(() => {
 
     opacity: 0;
 
-    transform: translateX(20px);
+    transform: translateX(12px) scale(0.97);
 
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .modal-fade-enter-active,
+    .modal-fade-leave-active {
+        transition-duration: 120ms !important;
+    }
+
+    .docs-panel-enter-active,
+    .docs-panel-leave-active {
+        transition-duration: 120ms !important;
+    }
+
+    .docs-panel-enter-from,
+    .docs-panel-leave-to {
+        transform: none;
+    }
 }
 
 .docs-panel-enter-to,
