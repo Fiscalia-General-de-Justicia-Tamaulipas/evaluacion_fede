@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import Login from './views/auth/LoginView.vue';
 import Register from './views/auth/RegisterView.vue';
 import PasswordRecovery from './views/auth/PasswordRecoveryView.vue';
+import CourseCatalog from './views/courses/CourseCatalogView.vue';
 import ExamFlow from './views/exams/ExamFlowView.vue';
 import ModulePanel from './views/modules/ModulePanelView.vue';
 import ExamModule from './views/exams/ExamModuleView.vue';
@@ -11,6 +12,7 @@ import { useAuth } from './services/auth';
 const { isAuthenticated } = useAuth();
 const resetToken = ref(new URLSearchParams(window.location.search).get('reset_token') || '');
 const authView = ref<'login' | 'register' | 'forgot' | 'recovery'>(resetToken.value ? 'recovery' : 'login');
+const selectedCourse = ref(false);
 const selectedModule = ref<number | null>(null);
 const authNotice = ref('');
 
@@ -39,6 +41,7 @@ function passwordResetCompleted() {
 
 watch(isAuthenticated, (authenticated) => {
   if (authenticated) {
+    selectedCourse.value = false;
     selectedModule.value = null;
   }
 });
@@ -46,10 +49,16 @@ watch(isAuthenticated, (authenticated) => {
 
 <template>
   <a href="#main-content" class="sr-only z-[100] rounded-md bg-white px-4 py-3 font-semibold text-[#202020] focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus-visible:outline">Saltar al contenido principal</a>
+  <CourseCatalog
+    v-if="!resetToken && isAuthenticated && !selectedCourse"
+    key="courses"
+    @select-course="selectedCourse = true"
+  />
   <ModulePanel
-    v-if="!resetToken && isAuthenticated && selectedModule === null"
+    v-else-if="!resetToken && isAuthenticated && selectedModule === null"
     key="modules"
     @select-module="selectedModule = $event"
+    @back-courses="selectedCourse = false"
   />
   <ExamFlow
     v-else-if="!resetToken && isAuthenticated && selectedModule === 1"

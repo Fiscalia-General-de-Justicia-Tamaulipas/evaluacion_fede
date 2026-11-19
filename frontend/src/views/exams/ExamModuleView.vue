@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, LockKeyhole, PlayCircle, X } from 'lucide-vue-next';
 import { useAuth } from '../../services/auth';
 import EvaluationResult from '../../components/exam/EvaluationResult.vue';
-import { openCertificateWindow, renderCertificateDraft } from '../../services/certificate';
 import InstitutionalHeader from '../../components/layout/InstitutionalHeader.vue';
 import BaseAlert from '../../components/ui/BaseAlert.vue';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue';
@@ -33,7 +32,7 @@ const message = ref('');
 const showFinishConfirmation = ref(false);
 const videoModalOpen = ref(false);
 const modalVideoRef = ref<HTMLVideoElement | null>(null);
-const result = ref({ score: 0, correct: 0, total: 0, passed: false, attempt: 1, certificateId: null as number | null });
+const result = ref({ score: 0, correct: 0, total: 0, passed: false, attempt: 1 });
 
 const q = computed(() => questions.value[current.value]);
 const allAnswered = computed(() => questions.value.length > 0 && questions.value.every(question => answers.value[question.id] != null));
@@ -87,7 +86,6 @@ async function restore() {
       total: data.evaluation.total_questions ?? 0,
       passed: !!data.evaluation.passed,
       attempt: data.evaluation.attempt_number ?? 1,
-      certificateId: null,
     };
     stage.value = 'result';
     return;
@@ -237,7 +235,6 @@ async function finishConfirmed() {
       total: data.total,
       passed: data.passed,
       attempt: data.attempt_number,
-      certificateId: data.certificate_id,
     };
     stage.value = 'result';
   } catch (error: any) {
@@ -255,31 +252,6 @@ function retry() {
   videoDone.value = false;
   message.value = '';
   stage.value = 'intro';
-}
-
-async function openCertificate() {
-  const certificateWindow = openCertificateWindow();
-  if (!certificateWindow) {
-    message.value = 'El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para este sitio e inténtalo de nuevo.';
-    return;
-  }
-  try {
-    const response = await apiFetch(`/api/certificates/${props.moduleId}`);
-    const data = await response.json().catch(() => null);
-    if (!response.ok && response.status !== 404) {
-      throw new Error(data?.detail || 'No se pudo consultar la información de la constancia.');
-    }
-    renderCertificateDraft(certificateWindow, {
-      moduleId: props.moduleId,
-      moduleName: data?.module_name || names[props.moduleId],
-      participantName: data?.user_name || fullName.value,
-      score: data?.score ?? result.value.score,
-      issuedAt: data?.issued_at || new Date(),
-    });
-  } catch (error: any) {
-    certificateWindow.close();
-    message.value = error?.message || 'No fue posible conectar con el servidor. Intenta cargar la constancia de nuevo.';
-  }
 }
 
 onMounted(() => {
@@ -462,7 +434,6 @@ onBeforeUnmount(() => {
         :message="message"
         @retry="retry"
         @back="emit('back')"
-        @certificate="openCertificate"
       />
     </main>
 

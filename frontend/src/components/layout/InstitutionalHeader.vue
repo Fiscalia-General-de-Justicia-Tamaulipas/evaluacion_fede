@@ -4,12 +4,14 @@ import { ArrowLeft, LogOut } from 'lucide-vue-next';
 withDefaults(defineProps<{
   showBack?: boolean;
   showLogout?: boolean;
+  backLabel?: string;
   moduleLabel?: string;
   participantName?: string;
   sector?: string;
 }>(), {
   showBack: false,
   showLogout: false,
+  backLabel: 'Panel de módulos',
   moduleLabel: '',
   participantName: '',
   sector: '',
@@ -37,8 +39,8 @@ const emit = defineEmits<{
         </div>
         <p v-else-if="participantName" class="hidden max-w-56 truncate text-sm font-bold text-[var(--color-brand-900)] md:block">{{ participantName }}</p>
 
-        <button v-if="showBack" type="button" title="Regresar al panel de módulos" aria-label="Regresar al panel de módulos" class="institutional-header__button page-control inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-2 text-sm font-semibold sm:w-auto sm:px-3" @click="emit('back')">
-          <ArrowLeft :size="18" aria-hidden="true" /><span class="hidden sm:inline">Panel de módulos</span>
+        <button v-if="showBack" type="button" :title="`Regresar a ${backLabel.toLowerCase()}`" :aria-label="`Regresar a ${backLabel.toLowerCase()}`" class="institutional-header__button page-control inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-2 text-sm font-semibold sm:w-auto sm:px-3" @click="emit('back')">
+          <ArrowLeft :size="18" aria-hidden="true" /><span class="hidden sm:inline">{{ backLabel }}</span>
         </button>
         <button v-if="showLogout" type="button" title="Cerrar sesión" aria-label="Cerrar sesión" class="institutional-header__button page-control inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-2 text-sm font-semibold sm:w-auto sm:px-3" @click="emit('logout')">
           <LogOut :size="18" aria-hidden="true" /><span class="hidden sm:inline">Cerrar sesión</span>

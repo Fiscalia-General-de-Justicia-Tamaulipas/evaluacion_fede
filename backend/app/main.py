@@ -12,6 +12,7 @@ from secrets import SystemRandom, token_urlsafe
 from urllib.parse import urlencode
 from urllib.request import Request as URLRequest, urlopen
 from urllib.error import URLError, HTTPError
+from uuid import uuid4
 
 from dotenv import load_dotenv
 
@@ -58,6 +59,7 @@ from sqlalchemy.orm import (
     relationship,
     sessionmaker,
 )
+from sqlalchemy.exc import IntegrityError
 
 
 # ============================================================
@@ -111,6 +113,9 @@ def score_percentage(value: int | None) -> int | None:
 
 
 PASSING_SCORE = 70
+COURSE_KEY = "delitos-electorales-investigacion-sistema-electoral-mexicano"
+COURSE_NAME = "Delitos Electorales y su investigación en el Sistema Electoral Mexicano"
+COURSE_MODULE_IDS = (1, 2, 3)
 
 
 # ============================================================
@@ -798,21 +803,19 @@ class Certificate(Base):
         nullable=False,
     )
 
-    module_id: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-    )
+    course_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    folio: Mapped[str] = mapped_column(String(48), nullable=False)
+    user_name: Mapped[str] = mapped_column(String(320), nullable=False)
 
-    evaluation_id: Mapped[int] = mapped_column(
+    module_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    evaluation_id: Mapped[int | None] = mapped_column(
         ForeignKey("evaluations.id"),
-        nullable=False,
+        nullable=True,
         unique=True,
     )
 
-    score: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-    )
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     issued_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -821,11 +824,8 @@ class Certificate(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint(
-            "user_id",
-            "module_id",
-            name="uq_certificate_user_module",
-        ),
+        UniqueConstraint("user_id", "course_key", name="uq_certificate_user_course"),
+        UniqueConstraint("folio", name="uq_certificate_folio"),
     )
 
 
@@ -2807,6 +2807,8 @@ def get_questions(
     if module_id not in (1, 2, 3):
         raise HTTPException(status_code=400, detail="Módulo no válido.")
 
+    _require_available_module(db, current_user.id, module_id)
+
     questions = db.scalars(
         select(Question)
         .where(Question.module_id == module_id)
@@ -2831,11 +2833,7 @@ def get_questions(
     ]
 
 
-@app.get("/api/modules/status")
-def get_modules_status(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def _module_statuses_for_user(db: Session, user_id: int) -> list[dict]:
     module_names = {
         1: "Nociones básicas de derecho electoral",
         2: "Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales",
@@ -2843,7 +2841,7 @@ def get_modules_status(
     }
     result = []
 
-    for module_id, name in module_names.items():
+    for module_id in COURSE_MODULE_IDS:
         questions_available = int(db.scalar(
             select(text("COUNT(*)")).select_from(Question).where(
                 Question.module_id == module_id
@@ -2851,21 +2849,14 @@ def get_modules_status(
         ) or 0) > 0
         completed = db.scalars(
             select(Evaluation).where(
-                Evaluation.user_id == current_user.id,
+                Evaluation.user_id == user_id,
                 Evaluation.module_id == module_id,
                 Evaluation.completed_at.is_not(None),
             ).order_by(Evaluation.completed_at.desc())
         ).all()
-
-        certificate = db.scalar(
-            select(Certificate).where(
-                Certificate.user_id == current_user.id,
-                Certificate.module_id == module_id,
-            )
-        )
         in_progress = db.scalar(
             select(Evaluation.id).where(
-                Evaluation.user_id == current_user.id,
+                Evaluation.user_id == user_id,
                 Evaluation.module_id == module_id,
                 Evaluation.completed_at.is_(None),
             ).limit(1)
@@ -2874,58 +2865,175 @@ def get_modules_status(
             (score_percentage(item.score) for item in completed if item.score is not None),
             default=None,
         )
+        passed = best_score is not None and best_score >= PASSING_SCORE
+        attempts_remaining = max(0, 3 - len(completed))
         result.append({
             "module_id": module_id,
-            "name": name,
+            "name": module_names[module_id],
             "attempts": len(completed),
-            "attempts_remaining": max(0, 3 - len(completed)),
+            "attempts_remaining": attempts_remaining,
             "best_score": best_score,
-            "passed": best_score is not None and best_score >= PASSING_SCORE,
+            "passed": passed,
             "in_progress": in_progress,
             "questions_available": questions_available,
-            "certificate": {
-                "id": certificate.id,
-                "score": certificate.score,
-                "issued_at": certificate.issued_at,
-            } if certificate else None,
+            "available": (
+                not passed
+                and all(previous["passed"] for previous in result)
+                and (in_progress or attempts_remaining > 0)
+            ),
         })
 
-    return {"modules": result}
+    return result
 
 
-@app.get("/api/certificates/{module_id}")
-def get_certificate(
-    module_id: int,
+def _require_available_module(db: Session, user_id: int, module_id: int) -> None:
+    statuses = _module_statuses_for_user(db, user_id)
+    status = next(module for module in statuses if module["module_id"] == module_id)
+
+    if status["passed"]:
+        raise HTTPException(
+            status_code=409,
+            detail="Este módulo ya fue acreditado y no se puede repetir.",
+        )
+
+    if not all(
+        module["passed"]
+        for module in statuses
+        if module["module_id"] < module_id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Debes acreditar los módulos anteriores antes de continuar.",
+        )
+
+    if not status["in_progress"] and status["attempts_remaining"] == 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Has agotado los 3 intentos disponibles para este módulo.",
+        )
+
+
+@app.get("/api/modules/status")
+def get_modules_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if module_id not in (1, 2, 3):
-        raise HTTPException(status_code=400, detail="Módulo no válido.")
+    result = _module_statuses_for_user(db, current_user.id)
+
+    return {
+        "modules": result,
+        "course": {
+            "key": COURSE_KEY,
+            "name": COURSE_NAME,
+            "completed": len([module for module in result if module["passed"]]) == len(COURSE_MODULE_IDS),
+        },
+    }
+
+
+def _passing_course_evaluations(db: Session, user_id: int) -> dict[int, Evaluation]:
+    evaluations = db.scalars(
+        select(Evaluation)
+        .where(
+            Evaluation.user_id == user_id,
+            Evaluation.module_id.in_(COURSE_MODULE_IDS),
+            Evaluation.completed_at.is_not(None),
+        )
+        .order_by(Evaluation.completed_at.desc())
+    ).all()
+    passing: dict[int, Evaluation] = {}
+    for evaluation in evaluations:
+        if score_percentage(evaluation.score) is not None and score_percentage(evaluation.score) >= PASSING_SCORE:
+            passing.setdefault(evaluation.module_id, evaluation)
+    return passing
+
+
+def _certificate_issue_data(certificate: Certificate) -> dict:
+    return {
+        "folio": certificate.folio,
+        "course_key": certificate.course_key,
+        "course_name": COURSE_NAME,
+        "user_name": certificate.user_name,
+        "issued_at": certificate.issued_at,
+    }
+
+
+@app.post("/api/certificates/generate")
+def generate_certificate(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    passing_evaluations = _passing_course_evaluations(db, current_user.id)
+    if set(passing_evaluations) != set(COURSE_MODULE_IDS):
+        raise HTTPException(
+            status_code=409,
+            detail="Debes acreditar los tres módulos para generar la constancia del curso.",
+        )
 
     certificate = db.scalar(
         select(Certificate).where(
             Certificate.user_id == current_user.id,
-            Certificate.module_id == module_id,
+            Certificate.course_key == COURSE_KEY,
         )
     )
     if not certificate:
-        raise HTTPException(
-            status_code=404,
-            detail="No existe constancia para este módulo.",
+        issued_at = datetime.now(timezone.utc)
+        certificate = Certificate(
+            user_id=current_user.id,
+            course_key=COURSE_KEY,
+            folio=f"FEDE-{issued_at.year}-{uuid4().hex.upper()}",
+            user_name=current_user.full_name,
+            issued_at=issued_at,
         )
+        db.add(certificate)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            certificate = db.scalar(
+                select(Certificate).where(
+                    Certificate.user_id == current_user.id,
+                    Certificate.course_key == COURSE_KEY,
+                )
+            )
+            if certificate is None:
+                raise
+        else:
+            db.refresh(certificate)
 
-    module_names = {
-        1: "Nociones básicas de derecho electoral",
-        2: "Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales",
-        3: "Integración de la carpeta de investigación, primer respondiente, retos en la investigación y cultura de prevención",
-    }
+    return _certificate_issue_data(certificate)
+
+
+@app.get("/api/certificates/verify/{folio}")
+def verify_certificate(
+    folio: str,
+    db: Session = Depends(get_db),
+):
+    certificate = db.scalar(
+        select(Certificate).where(Certificate.folio == folio)
+    )
+    if not certificate or certificate.course_key != COURSE_KEY:
+        return {"valid": False, "message": "La constancia no es válida."}
+
+    user = db.get(User, certificate.user_id)
+    if not user:
+        return {"valid": False, "message": "La constancia no es válida."}
+
     return {
-        "id": certificate.id,
-        "user_name": current_user.full_name,
-        "module_id": module_id,
-        "module_name": module_names[module_id],
-        "score": score_percentage(certificate.score),
+        "valid": True,
+        "message": "La constancia es válida.",
+        "folio": certificate.folio,
         "issued_at": certificate.issued_at,
+        "user": {
+            "full_name": certificate.user_name,
+            "municipality": user.municipality_other or (
+                user.municipality.name if user.municipality else None
+            ),
+            "sector": user.sector.name if user.sector else None,
+        },
+        "course": {
+            "key": certificate.course_key,
+            "name": COURSE_NAME,
+        },
     }
 
 
@@ -2945,6 +3053,8 @@ def get_current_evaluation(
 ):
     if module_id not in (1, 2, 3):
         raise HTTPException(status_code=400, detail="Módulo no válido.")
+
+    _require_available_module(db, current_user.id, module_id)
 
     evaluation = db.scalar(
         select(Evaluation)
@@ -3073,6 +3183,8 @@ def start_evaluation(
 ):
     if module_id not in (1, 2, 3):
         raise HTTPException(status_code=400, detail="Módulo no válido.")
+
+    _require_available_module(db, current_user.id, module_id)
 
     existing_evaluation = db.scalar(
         select(Evaluation)
@@ -3294,6 +3406,8 @@ def mark_video_completed(
             detail="No tienes acceso a esta evaluación.",
         )
 
+    _require_available_module(db, current_user.id, evaluation.module_id)
+
     if evaluation.completed_at:
         raise HTTPException(
             status_code=409,
@@ -3349,6 +3463,8 @@ def save_answer(
             status_code=403,
             detail="No tienes acceso a esta evaluación.",
         )
+
+    _require_available_module(db, current_user.id, evaluation.module_id)
 
     if evaluation.completed_at:
         raise HTTPException(
@@ -3504,6 +3620,8 @@ def save_evaluation_progress(
             detail="No tienes acceso a esta evaluación.",
         )
 
+    _require_available_module(db, current_user.id, evaluation.module_id)
+
     if evaluation.completed_at:
         raise HTTPException(
             status_code=409,
@@ -3574,6 +3692,8 @@ def finish_evaluation(
             status_code=403,
             detail="No tienes acceso a esta evaluación.",
         )
+
+    _require_available_module(db, current_user.id, evaluation.module_id)
 
     if not evaluation.video_completed:
         raise HTTPException(
@@ -3677,27 +3797,6 @@ def finish_evaluation(
         datetime.now(timezone.utc)
     )
 
-    certificate_id = None
-    if score >= PASSING_SCORE:
-        existing_certificate = db.scalar(
-            select(Certificate).where(
-                Certificate.user_id == current_user.id,
-                Certificate.module_id == evaluation.module_id,
-            )
-        )
-        if not existing_certificate:
-            certificate = Certificate(
-                user_id=current_user.id,
-                module_id=evaluation.module_id,
-                evaluation_id=evaluation.id,
-                score=score,
-            )
-            db.add(certificate)
-            db.flush()
-            certificate_id = certificate.id
-        else:
-            certificate_id = existing_certificate.id
-
     db.commit()
 
     db.refresh(evaluation)
@@ -3725,6 +3824,4 @@ def finish_evaluation(
             evaluation.attempt_number,
         "passed":
             score >= PASSING_SCORE,
-        "certificate_id":
-            certificate_id,
     }

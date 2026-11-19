@@ -12,7 +12,7 @@ describe('flujo de evaluación', () => {
       if (url.includes('/api/evaluations/current')) return new Response(JSON.stringify({ has_evaluation: true, evaluation: { id: 24, completed: false, video_completed: true, answers: [], question_order: [11] } }), { status: 200 });
       if (url.includes('/api/evaluations/start')) return new Response(JSON.stringify({ evaluation_id: 24, video_completed: true, question_order: [11], answers: [] }), { status: 200 });
       if (url.includes('/api/evaluations/24/answers')) return new Response('{}', { status: 200 });
-      if (url.includes('/api/evaluations/24/finish')) return new Response(JSON.stringify({ score: 70, correct: 1, total: 1, passed: true, attempt_number: 1, certificate_id: 4 }), { status: 200 });
+      if (url.includes('/api/evaluations/24/finish')) return new Response(JSON.stringify({ score: 70, correct: 1, total: 1, passed: true, attempt_number: 1 }), { status: 200 });
       return new Response('{}', { status: 200 });
     }));
     vi.spyOn(window, 'confirm').mockReturnValue(true);

@@ -1,6 +1,6 @@
 # Frontend de Evaluación Institucional
 
-Aplicación de capacitación y evaluación modular. La interfaz consume la API FastAPI existente y conserva sus rutas y contratos. No contiene administración de módulos ni exámenes porque esos flujos no existen en el frontend actual.
+Aplicación de capacitación y evaluación modular. La plataforma tiene un catálogo de cursos, permite acceder a los tres módulos del curso actual y emite una constancia única cuando se acreditan todos.
 
 ## Estructura
 
@@ -10,22 +10,24 @@ src/
     exam/       Resultado reutilizable y sus pruebas
     layout/     Header institucional con ambos logotipos
     ui/         Botón, tarjeta, alerta y estados base
-  services/     Sesión/API y constancia imprimible
+  services/     Sesión/API y generación de PDF con QR
   styles/       Tokens globales, tipografía, foco y movimiento
   views/
     auth/       Inicio de sesión y registro
+    certificates/ Verificación pública por folio
+    courses/    Catálogo de cursos con avance
     exams/      Flujos de evaluación de módulos
     modules/    Panel y estados de módulos
-  App.vue       Navegación de pantalla existente por eventos
-  main.ts       Montaje de Vue
+  App.vue       Flujo de sesión, catálogo, módulos y evaluación
+  main.ts       Montaje de Vue y ruta pública de verificación
 ```
 
-La app no tenía Vue Router ni store central; para conservar el comportamiento y evitar una migración de arquitectura, la navegación de autenticación, panel y módulo sigue coordinada por `App.vue`. La sesión vive en `services/auth.ts`. Los módulos 2 y 3 comparten `ExamModuleView`; el módulo 1 conserva su flujo particular con material de apoyo.
+La navegación existente de autenticación, catálogo, panel y módulos sigue coordinada por `App.vue`; Vue Router se usa para la ruta pública `/verificar/:folio`, que no requiere sesión. La sesión vive en `services/auth.ts`. Los módulos 2 y 3 comparten `ExamModuleView`; el módulo 1 conserva su flujo particular con material de apoyo.
 
 ## Diseño y accesibilidad
 
-- Escala neutral existente: tinta `#202020`, carbón `#3e3e3e`, gris `#575756`, línea `#d2d2d1` y papel `#f5f5f4`.
-- Tokens Tailwind en `src/styles/index.css`; tipografía de sistema con jerarquía por tamaño y peso; tarjetas de radio 1rem y sombra discreta.
+- Escala institucional definida en `src/styles/index.css`: `#575756`, `#878787`, `#dadada`, blanco y `#f7f7f7`; no se añaden colores de interfaz.
+- Tokens Tailwind existentes; tipografía sans-serif de sistema, jerarquía por tamaño y peso, bordes y sombras discretas.
 - Cards del panel con altura uniforme de 320 px y pie alineado al fondo.
 - Lucide Vue Next para iconos. Es la librería instalada; shadcn.io la documenta en su catálogo de bibliotecas de iconos: https://www.shadcn.io/icons/libraries.
 - Foco visible, enlace para saltar al contenido, roles `alert`/`status`, cabeceras institucionales con texto alternativo y movimiento reducido mediante `prefers-reduced-motion`.
@@ -36,12 +38,14 @@ La app no tenía Vue Router ni store central; para conservar el comportamiento y
 
 1. Inicio de sesión: `POST /api/auth/login`, persistencia de token y usuario.
 2. Registro: carga de catálogos y envío a la ruta existente de registro.
-3. Panel: `GET /api/modules/status`, reintento ante fallo y entrada al módulo.
+3. Panel: `GET /api/modules/status`, reintento ante fallo y entrada secuencial. Solo queda habilitado el siguiente módulo pendiente; acreditar uno lo bloquea y habilita el siguiente. Al acreditar el tercero, todos quedan bloqueados y no se pueden repetir.
 4. Evaluación: carga/recuperación, video obligatorio, inicio, guardado de respuesta y finalización.
-5. Resultado: acreditación con mínimo 70/100, hasta tres intentos y constancia borrador imprimible.
-6. Cierre de sesión y expiración 401 limpian la sesión local.
+5. Resultado por módulo: acreditación con mínimo 70/100 y hasta tres intentos; no emite una constancia individual.
+6. Al aprobar los tres módulos, `POST /api/certificates/generate` crea o recupera el folio del curso. `pdf-lib` compone el PDF desde la plantilla institucional adjunta y `qrcode` añade el QR público. Solo se conserva la metadata de emisión; el PDF se vuelve a generar y descargar en cada solicitud.
+7. La ruta pública `/verificar/:folio` consulta `GET /api/certificates/verify/{folio}` sin autenticar y presenta validez, folio, fecha, curso y datos no sensibles del usuario.
+8. Cierre de sesión y expiración 401 limpian la sesión local.
 
-No se alteraron endpoints ni backend. Cuando la API no devuelve una constancia institucional formal, la vista imprimible conserva los datos entregados por la API y marca el documento como borrador.
+Para bases de datos existentes, aplicar `alembic upgrade head` en el contenedor `api` para agregar los campos de folio y los índices únicos por folio/curso.
 
 ## Desarrollo y pruebas
 
@@ -61,4 +65,4 @@ La suite Vitest usa Vue Test Utils y jsdom. Incluye pruebas del componente Alert
 
 ## Verificación visual manual
 
-Revisar con viewport de 375×812, 768×1024 y 1440×900: login y registro, panel (tres tarjetas en escritorio, una columna en móvil), header y logos dentro del módulo, modal de video, pregunta, resultado acreditado/no acreditado, error de API, zoom 200% y navegación solo con teclado. Comprobar el movimiento reducido desde la configuración del sistema operativo. Ejecutar un examen con cuenta de prueba en backend para validar los contratos reales antes de publicar.
+Revisar con viewport de 375×812, 768×1024 y 1440×900: login y registro, catálogo y avance, panel de módulos, modal de video, pregunta, resultado, descarga del PDF, escaneo del QR y estados válido/no válido/error de verificación. Comprobar zoom 200%, navegación solo con teclado y movimiento reducido. Ejecutar un examen con cuenta de prueba en backend para validar los contratos reales antes de publicar.

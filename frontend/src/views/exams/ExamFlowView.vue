@@ -20,7 +20,6 @@ import {
 
 import { useAuth } from '../../services/auth';
 import EvaluationResult from '../../components/exam/EvaluationResult.vue';
-import { openCertificateWindow, renderCertificateDraft } from '../../services/certificate';
 import InstitutionalHeader from '../../components/layout/InstitutionalHeader.vue';
 import BaseAlert from '../../components/ui/BaseAlert.vue';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue';
@@ -1131,30 +1130,6 @@ async function finishConfirmed() {
     }
 }
 
-async function openCertificate() {
-    const popup = openCertificateWindow();
-    if (!popup) {
-        message.value = 'El navegador bloqueó la ventana. Permite ventanas emergentes e inténtalo de nuevo.';
-        return;
-    }
-    try {
-        const response = await apiFetch('/api/certificates/1');
-        const data = await response.json().catch(() => null);
-        if (!response.ok && response.status !== 404) throw new Error(data?.detail || 'No se pudo consultar la información de la constancia.');
-        renderCertificateDraft(popup, {
-            moduleId: 1,
-            moduleName: data?.module_name || 'Nociones básicas de derecho electoral',
-            participantName: data?.user_name || fullName.value,
-            score: data?.score ?? result.value.score,
-            issuedAt: data?.issued_at || new Date(),
-        });
-    } catch (error: any) {
-        popup.close();
-        message.value = error?.message || 'No se pudo generar la constancia.';
-    }
-}
-
-
 /* =========================================================
    RESTART
    ========================================================= */
@@ -1818,7 +1793,7 @@ onUnmounted(() => {
                  RESULT
             ==================================================== -->
 
-            <EvaluationResult v-else module-id="1" module-name="Nociones básicas de derecho electoral" :score="result.score" :correct="result.correct" :total="result.total" :attempt="result.attempt" :attempts-remaining="result.attemptsRemaining" :message="message" @retry="restart" @back="emit('back')" @certificate="openCertificate" />
+            <EvaluationResult v-else module-id="1" module-name="Nociones básicas de derecho electoral" :score="result.score" :correct="result.correct" :total="result.total" :attempt="result.attempt" :attempts-remaining="result.attemptsRemaining" :message="message" @retry="restart" @back="emit('back')" />
 
         </main>
 

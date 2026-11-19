@@ -1,4 +1,20 @@
-import { createApp } from 'vue';
+import { createApp, h } from 'vue';
+import { createRouter, createWebHistory, RouterView } from 'vue-router';
 import './styles/index.css';
-import App from './App.vue';
-createApp(App).mount('#app');
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: '/verificar/:folio',
+      component: () => import('./views/certificates/CertificateVerificationView.vue'),
+      props: true,
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      component: () => import('./App.vue'),
+    },
+  ],
+});
+
+createApp({ render: () => h(RouterView) }).use(router).mount('#app');

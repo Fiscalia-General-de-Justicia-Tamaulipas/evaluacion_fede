@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Award, ArrowLeft, BadgeCheck, FileText, RotateCcw } from 'lucide-vue-next';
+import { Award, ArrowLeft, BadgeCheck, RotateCcw } from 'lucide-vue-next';
 import BaseAlert from '../ui/BaseAlert.vue';
 
 withDefaults(defineProps<{
@@ -16,7 +16,6 @@ withDefaults(defineProps<{
 const emit = defineEmits<{
   (event: 'retry'): void;
   (event: 'back'): void;
-  (event: 'certificate'): void;
 }>();
 </script>
 
@@ -68,16 +67,13 @@ const emit = defineEmits<{
         <template v-if="attemptsRemaining">No alcanzaste los 70 puntos necesarios. Puedes revisar el material y volver a intentarlo.</template>
         <template v-else>No alcanzaste los 70 puntos y ya utilizaste tus tres intentos. Contacta al área de capacitación para recibir orientación.</template>
       </BaseAlert>
-      <BaseAlert v-if="message" class="mt-5" variant="destructive" title="No se pudo mostrar la constancia" :description="message" />
+      <BaseAlert v-if="message" class="mt-5" variant="destructive" title="No se pudo completar la acción" :description="message" />
 
       <div class="mt-7 flex flex-col-reverse gap-3 border-t border-[var(--color-line)] pt-5 sm:flex-row sm:justify-end">
         <button type="button" class="result-button result-button--secondary page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] border px-4 py-2.5 text-sm font-semibold" @click="emit('back')">
           <ArrowLeft :size="17" aria-hidden="true" /> Regresar al panel
         </button>
-        <button v-if="score >= 70" type="button" class="result-button result-button--primary page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold" @click="emit('certificate')">
-          <FileText :size="17" aria-hidden="true" /> Ver constancia borrador
-        </button>
-        <button v-else-if="attemptsRemaining > 0" type="button" class="result-button result-button--primary page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold" @click="emit('retry')">
+        <button v-if="score < 70 && attemptsRemaining > 0" type="button" class="result-button result-button--primary page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold" @click="emit('retry')">
           <RotateCcw :size="17" aria-hidden="true" /> Reintentar examen
         </button>
       </div>

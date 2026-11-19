@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
 import EvaluationResult from './EvaluationResult.vue';
 
@@ -12,12 +12,12 @@ const defaults = {
 };
 
 describe('EvaluationResult', () => {
-  it('acredita solo con calificación de 70 o más y ofrece constancia', async () => {
+  it('acredita con calificación mínima y no ofrece constancia de un módulo individual', () => {
     const wrapper = mount(EvaluationResult, { props: { ...defaults, score: 70 } });
     expect(wrapper.text()).toContain('Módulo aprobado');
     expect(wrapper.text()).toContain('Acreditado');
-    await wrapper.get('button:nth-of-type(2)').trigger('click');
-    expect(wrapper.emitted('certificate')).toHaveLength(1);
+    expect(wrapper.text()).not.toContain('constancia');
+    expect(wrapper.emitted('certificate')).toBeUndefined();
   });
 
   it('permite reintentar mientras existan intentos y emite el evento', async () => {

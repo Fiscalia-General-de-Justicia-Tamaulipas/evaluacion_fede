@@ -1,54 +1,97 @@
-export type CertificateDraftData = {
-  moduleId: number;
-  moduleName: string;
-  participantName: string;
-  score: number;
-  issuedAt: string | Date;
+import type { PDFFont } from 'pdf-lib';
+
+export type CertificateIssueData = {
+  folio: string;
+  user_name: string;
+  course_name: string;
+  issued_at: string;
 };
 
-export function openCertificateWindow(): Window | null {
-  return window.open('', '_blank', 'width=1000,height=760');
+const PAGE_WIDTH = 1024;
+const PAGE_HEIGHT = 768;
+
+function centeredTextX(text: string, font: PDFFont, size: number) {
+  return Math.max(32, (PAGE_WIDTH - font.widthOfTextAtSize(text, size)) / 2);
 }
 
-function escapeHtml(value: unknown): string {
-  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[character]!);
+function wrapName(name: string, font: PDFFont, size: number, maxWidth: number) {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of name.trim().split(/\s+/).filter(Boolean)) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (line && font.widthOfTextAtSize(candidate, size) > maxWidth) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
-export function renderCertificateDraft(target: Window, data: CertificateDraftData) {
-  const issueDate = new Date(data.issuedAt);
-  const formattedDate = Number.isNaN(issueDate.getTime())
-    ? 'Fecha pendiente de confirmar'
-    : issueDate.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+export async function generateCourseCertificate(data: CertificateIssueData): Promise<void> {
+  const templateResponse = await fetch('/constancia-template.jpg');
+  if (!templateResponse.ok) throw new Error('No se pudo cargar la plantilla institucional de la constancia.');
 
-  target.document.write(`<!doctype html>
-  <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Borrador de constancia · Módulo ${escapeHtml(data.moduleId)}</title>
-  <style>
-    @page{size:landscape;margin:12mm}*{box-sizing:border-box}body{margin:0;background:#f0f0ef;color:#202020;font:16px/1.5 Arial,Helvetica,sans-serif}
-    .sheet{width:100%;min-height:180mm;margin:0 auto;padding:18mm 22mm;position:relative;display:grid;place-items:center;overflow:hidden;background:#fff;border:2px solid #575756}
-    .logos{position:absolute;inset:9mm 12mm auto;display:flex;justify-content:space-between;align-items:center}.logos img{width:min(25vw,185px);height:48px;object-fit:contain}
-    .content{position:relative;z-index:1;width:100%;max-width:850px;text-align:center}.institution{margin:0;color:#575756;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
-    h1{margin:8px 0 20px;font:700 34px/1.15 Georgia,'Times New Roman',serif;letter-spacing:.02em}h2{margin:7px 0 14px;font:700 29px/1.2 Georgia,'Times New Roman',serif}
-    .module{max-width:740px;margin:12px auto;font-size:19px}.score{margin:12px 0 3px;font-weight:700}.date{margin:0;color:#575756;font-size:14px}
-    .signature{width:260px;margin:22px auto 0;padding-top:8px;border-top:1px solid #777;font-size:11px}.folio{margin:7px 0 0;font-size:11px;color:#575756}
-    .draft{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;color:rgba(150,36,36,.13);font-size:clamp(56px,10vw,100px);font-weight:900;letter-spacing:.16em;transform:rotate(-24deg)}
-    .notice{position:absolute;right:12mm;bottom:6mm;left:12mm;margin:0;text-align:center;color:#575756;font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
-    @media(max-width:650px){.sheet{min-height:100vh;padding:120px 22px 70px}h1{font-size:27px}h2{font-size:23px}.logos{inset:18px 20px auto}.logos img{width:30vw;height:40px}.draft{font-size:44px}}
-    @media print{body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sheet{min-height:180mm}}
-  </style></head><body><main class="sheet">
-    <div class="logos"><img src="/logo_fgjtam.png" alt="Fiscalía General de Justicia de Tamaulipas"><img src="/logo_fede.png" alt="Fiscalía Especializada en Delitos Electorales"></div>
-    <div class="draft">BORRADOR</div>
-    <section class="content"><p class="institution">Fiscalía General de Justicia del Estado de Tamaulipas</p><h1>Constancia de acreditación</h1>
-      <p>Se hace constar que</p><h2>${escapeHtml(data.participantName || 'Nombre del participante')}</h2>
-      <p class="module">acreditó el <strong>Módulo ${escapeHtml(data.moduleId)}: ${escapeHtml(data.moduleName)}</strong></p>
-      <p class="score">Calificación: ${escapeHtml(data.score)}/100</p><p class="date">Fecha de expedición: ${escapeHtml(formattedDate)}</p>
-      <p class="signature">[NOMBRE Y CARGO DE AUTORIDAD FACULTADA]</p><p class="folio">Folio institucional: [PENDIENTE DE ASIGNAR]</p>
-    </section><p class="notice">Documento de trabajo · borrador pendiente de validación institucional</p>
-  </main><script>window.addEventListener('load',()=>window.print())<\/script></body></html>`);
-  target.document.close();
+  const [{ PDFDocument, rgb, StandardFonts }, { default: QRCode }] = await Promise.all([
+    import('pdf-lib'),
+    import('qrcode'),
+  ]);
+  const institutionalGray = rgb(87 / 255, 87 / 255, 86 / 255);
+  const pdf = await PDFDocument.create();
+  const template = await pdf.embedJpg(await templateResponse.arrayBuffer());
+  const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  page.drawImage(template, { x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT });
+
+  const nameFont = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const detailFont = await pdf.embedFont(StandardFonts.Helvetica);
+  let nameSize = 25;
+  let nameLines = wrapName(data.user_name, nameFont, nameSize, PAGE_WIDTH - 96);
+  while (nameLines.length > 2 && nameSize > 16) {
+    nameSize -= 1;
+    nameLines = wrapName(data.user_name, nameFont, nameSize, PAGE_WIDTH - 96);
+  }
+  nameLines.forEach((line, index) => {
+    page.drawText(line, {
+      x: centeredTextX(line, nameFont, nameSize),
+      y: 365 - index * (nameSize + 2),
+      size: nameSize,
+      font: nameFont,
+      color: institutionalGray,
+    });
+  });
+
+  const qrUrl = `${window.location.origin}/verificar/${encodeURIComponent(data.folio)}`;
+  const qrDataUrl = await QRCode.toDataURL(qrUrl, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width: 256,
+    color: { dark: '#575756', light: '#FFFFFF' },
+  });
+  const qr = await pdf.embedPng(qrDataUrl);
+  const qrSize = 60;
+  const qrX = 932;
+  const qrY = 70;
+  page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+
+  const folioSize = 7;
+  const folioWidth = detailFont.widthOfTextAtSize(data.folio, folioSize);
+  page.drawText(data.folio, {
+    x: qrX + (qrSize - folioWidth) / 2,
+    y: qrY - 13,
+    size: folioSize,
+    font: detailFont,
+    color: institutionalGray,
+  });
+
+  const bytes = await pdf.save();
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  const download = document.createElement('a');
+  download.href = url;
+  download.download = `constancia-${data.folio}.pdf`;
+  document.body.appendChild(download);
+  download.click();
+  download.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
