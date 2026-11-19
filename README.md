@@ -45,6 +45,14 @@ En instalaciones existentes, aplicar las migraciones de base de datos después d
 docker compose exec api alembic upgrade head
 ```
 
+Después, cargar el catálogo de estados y municipios de México (32 estados y 2,478 municipios del INEGI):
+
+```bash
+docker compose exec api python -m app.seed_locations
+```
+
+El seeder es idempotente y se puede volver a ejecutar sin duplicar registros. En el registro, el municipio se carga al seleccionar el estado.
+
 La constancia se habilita al acreditar los tres módulos. La API conserva el folio y la fecha de emisión; el PDF y su QR se componen de nuevo en el navegador en cada solicitud y no se almacenan. La ruta pública de verificación es `/verificar/<folio>`.
 
 ## Recuperación de contraseña

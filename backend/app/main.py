@@ -266,6 +266,12 @@ class Municipality(Base):
     state_id: Mapped[int] = mapped_column(
         ForeignKey("states.id"),
         nullable=False,
+        index=True,
+    )
+
+    code: Mapped[str | None] = mapped_column(
+        String(5),
+        nullable=True,
     )
 
     name: Mapped[str] = mapped_column(
@@ -289,9 +295,8 @@ class Municipality(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "state_id",
-            "name",
-            name="uq_municipality_state_name",
+            "code",
+            name="uq_municipality_code",
         ),
     )
 
@@ -2188,6 +2193,7 @@ class MunicipalityOut(BaseModel):
     id: int
     state_id: int
     name: str
+    code: str | None = None
     is_other: bool
 
     model_config = ConfigDict(
@@ -2223,7 +2229,9 @@ class RegisterIn(BaseModel):
         max_length=18,
     )
 
-    municipality_id: int | None = None
+    state_id: int
+
+    municipality_id: int
 
     municipality_other: str | None = None
 
@@ -2510,18 +2518,28 @@ def register(
             detail="La CURP ya está registrada.",
         )
 
-    if data.municipality_id is not None:
-
-        municipality = db.get(
-            Municipality,
-            data.municipality_id,
+    if not db.get(State, data.state_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Estado inválido.",
         )
 
-        if not municipality:
-            raise HTTPException(
-                status_code=400,
-                detail="Municipio inválido.",
-            )
+    municipality = db.get(
+        Municipality,
+        data.municipality_id,
+    )
+
+    if not municipality:
+        raise HTTPException(
+            status_code=400,
+            detail="Municipio inválido.",
+        )
+
+    if municipality.state_id != data.state_id:
+        raise HTTPException(
+            status_code=400,
+            detail="El municipio seleccionado no corresponde al estado.",
+        )
 
     if data.gender_id is not None:
 

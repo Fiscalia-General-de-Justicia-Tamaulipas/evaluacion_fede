@@ -118,7 +118,8 @@ export type RegisterPayload = {
   email: string;
   password: string;
   curp: string;
-  municipality_id?: number | null;
+  state_id: number;
+  municipality_id: number;
   municipality_other?: string | null;
   municipality_other_state?: string | null;
   gender_id?: number | null;

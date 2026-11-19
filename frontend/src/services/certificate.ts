@@ -9,6 +9,8 @@ export type CertificateIssueData = {
 
 const LAYOUT_WIDTH = 1024;
 const LAYOUT_HEIGHT = 768;
+const NAME_BASE_SIZE = 32;
+const NAME_CENTER_Y = 350;
 
 function centeredTextX(text: string, font: PDFFont, size: number, pageWidth: number, minMargin: number) {
   return Math.max(minMargin, (pageWidth - font.widthOfTextAtSize(text, size)) / 2);
@@ -48,16 +50,19 @@ export async function generateCourseCertificate(data: CertificateIssueData): Pro
 
   const nameFont = await pdf.embedFont(StandardFonts.HelveticaBold);
   const detailFont = await pdf.embedFont(StandardFonts.Helvetica);
-  let nameSize = 25 * scaleY;
+  let nameSize = NAME_BASE_SIZE * scaleY;
   let nameLines = wrapName(data.user_name, nameFont, nameSize, pageWidth - 96 * scaleX);
   while (nameLines.length > 2 && nameSize > 16 * scaleY) {
     nameSize -= scaleY;
     nameLines = wrapName(data.user_name, nameFont, nameSize, pageWidth - 96 * scaleX);
   }
+  const nameLineGap = nameSize + 2 * scaleY;
+  const firstNameBaseline =
+    NAME_CENTER_Y * scaleY + ((nameLines.length - 1) * nameLineGap) / 2;
   nameLines.forEach((line, index) => {
     page.drawText(line, {
       x: centeredTextX(line, nameFont, nameSize, pageWidth, 32 * scaleX),
-      y: 365 * scaleY - index * (nameSize + 2 * scaleY),
+      y: firstNameBaseline - index * nameLineGap,
       size: nameSize,
       font: nameFont,
       color: institutionalGray,

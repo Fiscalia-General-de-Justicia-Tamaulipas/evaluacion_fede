@@ -61,6 +61,14 @@ describe('generateCourseCertificate', () => {
       'Ada López Pérez',
       'FEDE-2026-0123456789ABCDEF',
     ]);
+    const [nameText, nameOptions] = textDraws.mock.calls[0];
+    expect(nameOptions.size).toBeCloseTo(32 * (612 / 768));
+    expect(nameOptions.y).toBeCloseTo(350 * (612 / 768));
+    if (!nameOptions.font || nameOptions.x === undefined || nameOptions.size === undefined) {
+      throw new Error('The rendered name must include its font, position, and size.');
+    }
+    const nameWidth = nameOptions.font.widthOfTextAtSize(nameText, nameOptions.size);
+    expect(nameOptions.x + nameWidth / 2).toBeCloseTo(792 / 2);
     expect(textDraws.mock.calls[1][1].y).toBeCloseTo(57 * (612 / 768));
     expect(textDraws.mock.calls[1][1].size).toBeCloseTo(7 * (612 / 768));
     expect(imageDraws).toHaveBeenCalledOnce();
