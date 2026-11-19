@@ -14,6 +14,31 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _has_question_module_number_unique(bind) -> bool:
+    inspector = sa.inspect(bind)
+    expected_columns = ("module_id", "number")
+    unique_objects = inspector.get_unique_constraints("questions")
+    unique_objects.extend(
+        index
+        for index in inspector.get_indexes("questions")
+        if index.get("unique")
+    )
+
+    for unique in unique_objects:
+        columns = tuple(unique.get("column_names") or [])
+        if (
+            unique.get("name") == "uq_question_module_number"
+            and columns != expected_columns
+        ):
+            raise RuntimeError(
+                "The existing uq_question_module_number key does not cover "
+                "(module_id, number)."
+            )
+        if columns == expected_columns:
+            return True
+    return False
+
+
 def upgrade() -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
@@ -43,11 +68,12 @@ def upgrade() -> None:
             type_="unique",
         )
 
-    op.create_unique_constraint(
-        "uq_question_module_number",
-        "questions",
-        ["module_id", "number"],
-    )
+    if not _has_question_module_number_unique(bind):
+        op.create_unique_constraint(
+            "uq_question_module_number",
+            "questions",
+            ["module_id", "number"],
+        )
 
     if "certificates" not in inspector.get_table_names():
         op.create_table(
