@@ -131,6 +131,7 @@ type EvaluationStartResponse = {
     evaluation_id: number;
     resumed: boolean;
     video_completed: boolean;
+    video_session_nonce: string;
     current_question: number;
     question_order: number[];
     answers: SavedAnswer[];
@@ -149,6 +150,7 @@ type CurrentEvaluationResponse = {
         attempts_remaining?: number;
         passed?: boolean;
         video_completed: boolean;
+        video_session_nonce?: string;
         started_at: string;
         current_question: number;
         question_order: number[];
@@ -190,6 +192,9 @@ const stage = ref<
 >('intro');
 
 const videoDone = ref(false);
+const videoNonce = ref('');
+const videoPlayedSeconds = ref(0);
+let lastVideoTime = 0;
 
 const videoModalOpen = ref(false);
 
@@ -232,7 +237,7 @@ const supportDocuments = ref<SupportDocument[]>([
 
     {
         id: 2,
-        title: 'Ley de Medios de Impugnacion Electorales',
+        title: 'Ley de Medios de Impugnación Electorales',
         url: '/docs/Ley de Medios de Impugnacion Electorales 29-mayo-2025-2.pdf',
     },
 
@@ -256,7 +261,7 @@ const supportDocuments = ref<SupportDocument[]>([
 
     {
         id: 6,
-        title: 'Ley General de Partidos Politicos',
+        title: 'Ley General de Partidos Políticos',
         url: '/docs/LGPP (1).pdf',
     },
 
@@ -408,6 +413,10 @@ async function loadQuestions() {
 
 function applyQuestionOrder(questionOrder: number[]) {
 
+    if (questionOrder.length === 0) {
+        return;
+    }
+
     const questionsById = new Map(
         questions.value.map((question) => [
             question.id,
@@ -419,12 +428,11 @@ function applyQuestionOrder(questionOrder: number[]) {
         .map((questionId) => questionsById.get(questionId))
         .filter((question): question is Question => Boolean(question));
 
-    questions.value = [
-        ...orderedQuestions,
-        ...questions.value.filter(
-            (question) => !questionOrder.includes(question.id)
-        ),
-    ];
+    if (orderedQuestions.length !== questionOrder.length) {
+        throw new Error('No se pudieron recuperar todas las preguntas de esta evaluación.');
+    }
+
+    questions.value = orderedQuestions;
 }
 
 
@@ -679,6 +687,8 @@ async function restoreEvaluation() {
 
         videoDone.value =
             evaluation.video_completed;
+        videoNonce.value =
+            evaluation.video_session_nonce ?? '';
 
         restoreAnswers(
             evaluation.answers ?? []
@@ -731,13 +741,95 @@ async function restoreEvaluation() {
 
 function videoEnded() {
 
+    trackVideoProgress(true);
     videoDone.value = true;
 
 }
 
 
-function openVideoModal() {
+const canContinueAfterVideo = computed(
+    () => videoDone.value && videoPlayedSeconds.value >= 10
+);
 
+
+function trackVideoProgress(includeFinalFrame = false) {
+    const video = modalVideoRef.value;
+    if (!video) {
+        return;
+    }
+
+    const currentTime = video.currentTime;
+    if ((!video.paused || includeFinalFrame) && !video.seeking && currentTime > lastVideoTime) {
+        videoPlayedSeconds.value += Math.min(currentTime - lastVideoTime, 1);
+    }
+    lastVideoTime = currentTime;
+}
+
+
+async function replayVideo() {
+    const video = modalVideoRef.value;
+    if (!video) {
+        return;
+    }
+
+    videoDone.value = false;
+    lastVideoTime = 0;
+    video.currentTime = 0;
+    try {
+        await video.play();
+    } catch (error) {
+        message.value = error instanceof Error
+            ? error.message
+            : 'No se pudo reproducir el video nuevamente.';
+        videoDone.value = true;
+    }
+}
+
+
+async function openVideoModal() {
+    if (loading.value || videoModalOpen.value) {
+        return;
+    }
+
+    if (!evaluationId.value || !videoNonce.value) {
+        loading.value = true;
+        message.value = '';
+        try {
+            const response = await apiFetch('/api/evaluations/start', {
+                method: 'POST',
+            });
+            const data: EvaluationStartResponse = await response.json().catch(() => null);
+            if (!response.ok) {
+                throw new Error(data?.detail || 'No se pudo preparar la evaluación.');
+            }
+            if (!data.video_session_nonce) {
+                throw new Error('No se pudo iniciar una sesión válida de reproducción.');
+            }
+
+            evaluationId.value = data.evaluation_id;
+            videoNonce.value = data.video_session_nonce;
+            restoreAnswers(data.answers ?? []);
+            applyQuestionOrder(data.question_order ?? []);
+            current.value = Math.min(
+                Math.max(data.current_question ?? 0, 0),
+                Math.max(questions.value.length - 1, 0),
+            );
+            if (data.video_completed) {
+                videoDone.value = true;
+                stage.value = 'exam';
+                return;
+            }
+        } catch (error) {
+            message.value = error instanceof Error
+                ? error.message
+                : 'No se pudo preparar la evaluación.';
+            return;
+        } finally {
+            loading.value = false;
+        }
+    }
+
+    lastVideoTime = 0;
     videoModalOpen.value = true;
 
     document.body.style.overflow = 'hidden';
@@ -750,6 +842,7 @@ function closeVideoModal() {
     videoModalOpen.value = false;
 
     modalVideoRef.value?.pause();
+    lastVideoTime = 0;
 
     document.body.style.overflow = '';
 
@@ -763,7 +856,7 @@ function closeVideoModal() {
 async function startExam() {
 
     if (
-        !videoDone.value ||
+        !canContinueAfterVideo.value ||
         loading.value
     ) {
         return;
@@ -775,78 +868,28 @@ async function startExam() {
 
     try {
 
-        const response =
-            await apiFetch(
-                '/api/evaluations/start',
-                {
-                    method: 'POST',
-                }
-            );
+        if (!evaluationId.value || !videoNonce.value) {
+            throw new Error('Abre el video de capacitación antes de iniciar la evaluación.');
+        }
 
-        if (!response.ok) {
-
-            const errorData =
-                await response
-                    .json()
-                    .catch(() => null);
-
+        const videoResponse = await apiFetch(
+            `/api/evaluations/${evaluationId.value}/video-completed`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    nonce: videoNonce.value,
+                    played_seconds: videoPlayedSeconds.value,
+                }),
+            },
+        );
+        if (!videoResponse.ok) {
+            const errorData = await videoResponse.json().catch(() => null);
             throw new Error(
-                errorData?.detail ||
-                'No se pudo iniciar la evaluación.'
+                errorData?.detail || 'No se pudo registrar el video completado.',
             );
-
-        }
-
-        const data:
-            EvaluationStartResponse =
-            await response.json();
-
-        evaluationId.value =
-            data.evaluation_id;
-
-        restoreAnswers(
-            data.answers ?? []
-        );
-
-        applyQuestionOrder(
-            data.question_order ?? []
-        );
-
-        if (
-            questions.value.length > 0
-        ) {
-
-            current.value =
-                Math.min(
-                    Math.max(
-                        data.current_question ??
-                        0,
-                        0
-                    ),
-                    questions.value.length -
-                    1
-                );
-
-        }
-
-        if (!data.video_completed) {
-
-            const videoResponse =
-                await apiFetch(
-                    `/api/evaluations/${evaluationId.value}/video-completed`,
-                    {
-                        method: 'POST',
-                    }
-                );
-
-            if (!videoResponse.ok) {
-
-                throw new Error(
-                    'No se pudo registrar el video completado.'
-                );
-
-            }
-
         }
 
         videoDone.value = true;
@@ -859,6 +902,10 @@ async function startExam() {
             'Error iniciando evaluación:',
             error
         );
+        message.value = error instanceof Error
+            ? error.message
+            : 'No se pudo iniciar la evaluación.';
+        closeVideoModal();
 
     } finally {
 
@@ -1607,6 +1654,7 @@ onUnmounted(() => {
                                 autoplay
                                 playsinline
                                 preload="metadata"
+                                @timeupdate="trackVideoProgress"
                                 @ended="videoEnded"
                             >
                                 <source src="/curso-modulo1.mp4" type="video/mp4" />
@@ -1617,12 +1665,21 @@ onUnmounted(() => {
                             <div class="mt-6 flex w-full max-w-6xl flex-col items-stretch justify-between gap-4 border-t border-white/15 pt-6 sm:flex-row sm:items-center">
                                 <p class="text-sm leading-6 text-white/75">
                                     <span v-if="!videoDone">La evaluación se habilita al terminar el video.</span>
+                                    <span v-else-if="!canContinueAfterVideo" class="font-bold text-white">Reproduce el video hasta acumular al menos 10 segundos.</span>
                                     <span v-else class="font-bold text-white">Video completado. Ya puedes continuar.</span>
                                 </p>
 
                                 <button
+                                    v-if="videoDone && !canContinueAfterVideo"
                                     type="button"
-                                    :disabled="!videoDone || loading"
+                                    class="page-control min-h-12 rounded-[var(--radius-control)] border border-white/50 px-5 py-3 text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-white/10"
+                                    @click="replayVideo"
+                                >
+                                    Reproducir nuevamente
+                                </button>
+                                <button
+                                    type="button"
+                                    :disabled="!canContinueAfterVideo || loading"
                                     class="page-control min-h-12 rounded-[var(--radius-control)] bg-white px-6 py-3 text-sm font-semibold text-[#202020] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eeeeed] disabled:cursor-not-allowed disabled:opacity-50"
                                     @click="startExam"
                                 >

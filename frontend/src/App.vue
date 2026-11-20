@@ -43,6 +43,8 @@ watch(isAuthenticated, (authenticated) => {
   if (authenticated) {
     selectedCourse.value = false;
     selectedModule.value = null;
+  } else {
+    authNotice.value = '';
   }
 });
 </script>

@@ -1,4 +1,5 @@
 import type { PDFFont } from 'pdf-lib';
+import { formatCertificateFolio, formatCertificateName } from '../lib/certificate-format';
 
 export type CertificateIssueData = {
   folio: string;
@@ -51,10 +52,11 @@ export async function generateCourseCertificate(data: CertificateIssueData): Pro
   const nameFont = await pdf.embedFont(StandardFonts.HelveticaBold);
   const detailFont = await pdf.embedFont(StandardFonts.Helvetica);
   let nameSize = NAME_BASE_SIZE * scaleY;
-  let nameLines = wrapName(data.user_name, nameFont, nameSize, pageWidth - 96 * scaleX);
+  const displayName = formatCertificateName(data.user_name);
+  let nameLines = wrapName(displayName, nameFont, nameSize, pageWidth - 96 * scaleX);
   while (nameLines.length > 2 && nameSize > 16 * scaleY) {
     nameSize -= scaleY;
-    nameLines = wrapName(data.user_name, nameFont, nameSize, pageWidth - 96 * scaleX);
+    nameLines = wrapName(displayName, nameFont, nameSize, pageWidth - 96 * scaleX);
   }
   const nameLineGap = nameSize + 2 * scaleY;
   const firstNameBaseline =
@@ -82,9 +84,10 @@ export async function generateCourseCertificate(data: CertificateIssueData): Pro
   const qrY = 70 * scaleY;
   page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
 
+  const displayFolio = formatCertificateFolio(data.folio);
   const folioSize = 7 * scaleY;
-  const folioWidth = detailFont.widthOfTextAtSize(data.folio, folioSize);
-  page.drawText(data.folio, {
+  const folioWidth = detailFont.widthOfTextAtSize(displayFolio, folioSize);
+  page.drawText(displayFolio, {
     x: qrX + (qrSize - folioWidth) / 2,
     y: qrY - 13 * scaleY,
     size: folioSize,

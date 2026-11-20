@@ -26,9 +26,15 @@ const current = ref(0);
 const answers = ref<Record<number, number>>({});
 const evaluationId = ref<number | null>(null);
 const videoDone = ref(false);
+const videoNonce = ref('');
+const videoPlayedSeconds = ref(0);
+let lastVideoTime = 0;
 const loading = ref(false);
 const savingAnswer = ref(false);
+const savingProgress = ref(false);
 const message = ref('');
+const pendingProgressPosition = ref<number | null>(null);
+const canRetryFinalization = ref(false);
 const showFinishConfirmation = ref(false);
 const videoModalOpen = ref(false);
 const modalVideoRef = ref<HTMLVideoElement | null>(null);
@@ -36,15 +42,66 @@ const result = ref({ score: 0, correct: 0, total: 0, passed: false, attempt: 1 }
 
 const q = computed(() => questions.value[current.value]);
 const allAnswered = computed(() => questions.value.length > 0 && questions.value.every(question => answers.value[question.id] != null));
-const progress = computed(() => questions.value.length ? (Object.keys(answers.value).length / questions.value.length) * 100 : 0);
-const answeredCount = computed(() => Object.keys(answers.value).length);
+const answeredCount = computed(() => questions.value.filter(question => answers.value[question.id] != null).length);
+const progress = computed(() => questions.value.length ? (answeredCount.value / questions.value.length) * 100 : 0);
 const maxReachableIndex = computed(() => {
   const nextUnanswered = questions.value.findIndex(question => answers.value[question.id] == null);
   return nextUnanswered === -1 ? Math.max(questions.value.length - 1, 0) : nextUnanswered;
 });
 const canNext = computed(() => !!q.value && answers.value[q.value.id] != null && current.value < maxReachableIndex.value);
+const canContinueAfterVideo = computed(() => videoDone.value && videoPlayedSeconds.value >= 10);
 
-function openVideoModal() {
+function trackVideoProgress(includeFinalFrame = false) {
+  const video = modalVideoRef.value;
+  if (!video) return;
+
+  const currentTime = video.currentTime;
+  if ((!video.paused || includeFinalFrame) && !video.seeking && currentTime > lastVideoTime) {
+    videoPlayedSeconds.value += Math.min(currentTime - lastVideoTime, 1);
+  }
+  lastVideoTime = currentTime;
+}
+
+async function replayVideo() {
+  const video = modalVideoRef.value;
+  if (!video) return;
+
+  videoDone.value = false;
+  lastVideoTime = 0;
+  video.currentTime = 0;
+  try {
+    await video.play();
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : 'No se pudo reproducir el video nuevamente.';
+    videoDone.value = true;
+  }
+}
+
+async function prepareEvaluation() {
+  if (evaluationId.value && videoNonce.value) return;
+  const response = await apiFetch(`/api/evaluations/start?module_id=${props.moduleId}`, {
+    method: 'POST',
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.detail || 'No se pudo preparar la evaluación.');
+  if (!data?.video_session_nonce) throw new Error('No se pudo iniciar una sesión válida de reproducción.');
+  await applyStart(data);
+}
+
+async function openVideoModal() {
+  if (loading.value || videoModalOpen.value) return;
+  loading.value = true;
+  message.value = '';
+  try {
+    await prepareEvaluation();
+    if (stage.value !== 'intro') return;
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : 'No se pudo preparar la evaluación.';
+    return;
+  } finally {
+    loading.value = false;
+  }
+  lastVideoTime = 0;
   videoModalOpen.value = true;
   document.body.style.overflow = 'hidden';
 }
@@ -52,6 +109,7 @@ function openVideoModal() {
 function closeVideoModal() {
   videoModalOpen.value = false;
   modalVideoRef.value?.pause();
+  lastVideoTime = 0;
   document.body.style.overflow = '';
 }
 
@@ -67,9 +125,14 @@ async function loadQuestions() {
 }
 
 function applyOrder(order: number[]) {
+  if (!order.length) return;
+
   const byId = new Map(questions.value.map(question => [question.id, question]));
   const ordered = order.map(id => byId.get(id)).filter((item): item is Question => !!item);
-  questions.value = [...ordered, ...questions.value.filter(question => !order.includes(question.id))];
+  if (ordered.length !== order.length) {
+    throw new Error('No se pudieron recuperar todas las preguntas de esta evaluación.');
+  }
+  questions.value = ordered;
 }
 
 async function restore() {
@@ -92,6 +155,7 @@ async function restore() {
   }
   evaluationId.value = data.evaluation.id;
   videoDone.value = data.evaluation.video_completed;
+  videoNonce.value = data.evaluation.video_session_nonce ?? '';
   for (const answer of data.evaluation.answers ?? []) answers.value[answer.question_id] = answer.option_id;
   applyOrder(data.evaluation.question_order ?? []);
   if (videoDone.value) {
@@ -109,21 +173,29 @@ async function restore() {
 }
 
 async function start() {
-  if (!videoDone.value || loading.value) return;
+  if (!canContinueAfterVideo.value || loading.value) return;
   loading.value = true;
   message.value = '';
   try {
-    const response = await apiFetch(`/api/evaluations/start?module_id=${props.moduleId}`, {
-      method: 'POST',
-    });
-    if (!response.ok) {
-      const data = await response.json().catch(() => null);
-      throw new Error(data?.detail || 'No se pudo iniciar la evaluación.');
-    } else {
-      await applyStart(await response.json());
+    if (!evaluationId.value || !videoNonce.value) {
+      throw new Error('Abre el video de capacitación antes de iniciar la evaluación.');
     }
+    const response = await apiFetch(`/api/evaluations/${evaluationId.value}/video-completed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nonce: videoNonce.value,
+        played_seconds: videoPlayedSeconds.value,
+      }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.detail || 'No se pudo registrar el video completado.');
+    closeVideoModal();
+    stage.value = 'exam';
+    videoDone.value = true;
   } catch (error: any) {
     message.value = error.message;
+    closeVideoModal();
   } finally {
     loading.value = false;
   }
@@ -131,6 +203,7 @@ async function start() {
 
 async function applyStart(data: any) {
   evaluationId.value = data.evaluation_id;
+  videoNonce.value = data.video_session_nonce;
   for (const answer of data.answers ?? []) answers.value[answer.question_id] = answer.option_id;
   applyOrder(data.question_order ?? []);
   if (questions.value.length > 0) {
@@ -139,16 +212,11 @@ async function applyStart(data: any) {
       questions.value.length - 1,
     );
   }
-  if (!data.video_completed) {
-    const response = await apiFetch(`/api/evaluations/${evaluationId.value}/video-completed`, { method: 'POST' });
-    if (!response.ok) {
-      const error = await response.json().catch(() => null);
-      throw new Error(error?.detail || 'No se pudo registrar el video completado. Intenta de nuevo.');
-    }
+  if (data.video_completed) {
+    stage.value = 'exam';
+    videoDone.value = true;
+    return;
   }
-  closeVideoModal();
-  stage.value = 'exam';
-  videoDone.value = true;
 }
 
 async function selectOption(optionId: number) {
@@ -176,30 +244,62 @@ async function selectOption(optionId: number) {
   }
 }
 
-async function saveCurrentProgress(position = current.value) {
-  if (!evaluationId.value) return;
+async function saveCurrentProgress(position: number): Promise<boolean> {
+  if (!evaluationId.value) {
+    message.value = 'No hay una evaluación activa para guardar el avance. Recarga el módulo para recuperar tu progreso.';
+    return false;
+  }
+  if (savingProgress.value) return false;
+  savingProgress.value = true;
   try {
     const response = await apiFetch(`/api/evaluations/${evaluationId.value}/progress`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ current_question: position }),
     });
-    if (!response.ok) message.value = 'No se pudo guardar tu avance. Comprueba tu conexión e inténtalo de nuevo.';
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const detail = typeof data?.detail === 'string'
+        ? data.detail
+        : `Error HTTP ${response.status}.`;
+      throw new Error(`El servidor rechazó el guardado: ${detail}`);
+    }
+    pendingProgressPosition.value = null;
+    message.value = '';
+    return true;
   } catch (error) {
-    message.value = error instanceof Error ? error.message : 'No se pudo guardar tu avance.';
+    pendingProgressPosition.value = position;
+    message.value = error instanceof TypeError
+      ? 'No se pudo conectar con el servidor. Tu respuesta sigue guardada; reintenta el avance.'
+      : error instanceof Error
+        ? error.message
+        : 'No se pudo guardar tu avance. Reintenta el guardado.';
+    return false;
+  } finally {
+    savingProgress.value = false;
   }
 }
 
+async function navigateToQuestion(position: number) {
+  if (savingProgress.value) return;
+  message.value = '';
+  if (await saveCurrentProgress(position)) current.value = position;
+}
+
+async function retryPendingProgress() {
+  const position = pendingProgressPosition.value;
+  if (position === null || savingProgress.value) return;
+  if (await saveCurrentProgress(position)) current.value = position;
+}
+
 async function previous() {
-  if (current.value <= 0) return;
-  current.value--;
-  await saveCurrentProgress();
+  if (current.value <= 0 || savingProgress.value) return;
+  await navigateToQuestion(current.value - 1);
 }
 
 async function next() {
-  if (!canNext.value) return;
-  current.value++;
-  await saveCurrentProgress();
+  if (!canNext.value || savingProgress.value) return;
+  await navigateToQuestion(current.value + 1);
 }
 
 async function goToQuestion(index: number) {
@@ -207,14 +307,16 @@ async function goToQuestion(index: number) {
     index < 0 ||
     index > maxReachableIndex.value ||
     index >= questions.value.length ||
-    index === current.value
+    index === current.value ||
+    savingProgress.value
   ) return;
-  current.value = index;
-  await saveCurrentProgress();
+  await navigateToQuestion(index);
 }
 
 async function finish() {
   if (!allAnswered.value || !evaluationId.value || loading.value) return;
+  message.value = '';
+  canRetryFinalization.value = false;
   showFinishConfirmation.value = true;
 }
 
@@ -222,13 +324,19 @@ async function finishConfirmed() {
   showFinishConfirmation.value = false;
   if (!allAnswered.value || !evaluationId.value || loading.value) return;
   loading.value = true;
+  message.value = '';
   try {
     const response = await apiFetch(`/api/evaluations/${evaluationId.value}/finish`, {
       method: 'POST',
       body: JSON.stringify({ answers: [] }),
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || 'No se pudo finalizar la evaluación.');
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const detail = typeof data?.detail === 'string'
+        ? data.detail
+        : `El servidor no pudo finalizar la evaluación (HTTP ${response.status}).`;
+      throw new Error(detail);
+    }
     result.value = {
       score: data.score,
       correct: data.correct,
@@ -236,12 +344,21 @@ async function finishConfirmed() {
       passed: data.passed,
       attempt: data.attempt_number,
     };
+    canRetryFinalization.value = false;
     stage.value = 'result';
   } catch (error: any) {
-    message.value = error.message;
+    canRetryFinalization.value = true;
+    message.value = error instanceof TypeError
+      ? 'No se pudo conectar con el servidor. Las respuestas siguen guardadas; puedes reintentar la finalización.'
+      : error?.message || 'No se pudo finalizar la evaluación. Puedes reintentarlo.';
   } finally {
     loading.value = false;
   }
+}
+
+function retryFinalization() {
+  if (!canRetryFinalization.value || loading.value) return;
+  void finishConfirmed();
 }
 
 function retry() {
@@ -270,7 +387,28 @@ onBeforeUnmount(() => {
     <InstitutionalHeader :show-back="true" :module-label="`Módulo ${moduleId}`" :participant-name="fullName" @back="emit('back')" />
 
     <main id="main-content" tabindex="-1" class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-      <BaseAlert v-if="message && stage !== 'result'" floating variant="destructive" title="No se pudo completar la acción" :description="message" />
+      <BaseAlert v-if="message && stage !== 'result'" floating variant="destructive" title="No se pudo completar la acción" :description="message">
+        <template #action>
+          <button
+            v-if="pendingProgressPosition !== null"
+            type="button"
+            :disabled="savingProgress"
+            class="rounded-md border border-red-800 px-3 py-1.5 font-semibold disabled:opacity-60"
+            @click="retryPendingProgress"
+          >
+            {{ savingProgress ? 'Reintentando…' : 'Reintentar guardado' }}
+          </button>
+          <button
+            v-if="canRetryFinalization"
+            type="button"
+            :disabled="loading"
+            class="rounded-md border border-red-800 px-3 py-1.5 font-semibold disabled:opacity-60"
+            @click="retryFinalization"
+          >
+            {{ loading ? 'Reintentando…' : 'Reintentar finalización' }}
+          </button>
+        </template>
+      </BaseAlert>
       <section v-if="stage === 'intro'" class="mx-auto max-w-4xl">
         <div class="rounded-[var(--radius-card)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-card)] sm:p-8 lg:p-10">
           <div class="flex items-center gap-2 text-sm font-semibold text-[var(--color-accent)]">
@@ -324,7 +462,16 @@ onBeforeUnmount(() => {
               </div>
 
               <div class="w-full max-w-6xl overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl md:rounded-3xl">
-                <video ref="modalVideoRef" class="mx-auto block max-h-[68vh] w-full object-contain" controls autoplay playsinline preload="metadata" @ended="videoDone = true">
+                <video
+                  ref="modalVideoRef"
+                  class="mx-auto block max-h-[68vh] w-full object-contain"
+                  controls
+                  autoplay
+                  playsinline
+                  preload="metadata"
+                  @timeupdate="trackVideoProgress"
+                  @ended="videoDone = true; trackVideoProgress(true)"
+                >
                   <source :src="`/curso-modulo${moduleId}.mp4`" type="video/mp4" />
                   Tu navegador no soporta video HTML5.
                 </video>
@@ -333,11 +480,22 @@ onBeforeUnmount(() => {
               <div class="mt-6 flex w-full max-w-6xl flex-col items-stretch justify-between gap-4 border-t border-white/15 pt-6 sm:flex-row sm:items-center">
                 <p class="text-sm leading-6 text-white/75">
                   <span v-if="!videoDone">La evaluación se habilita al terminar el video.</span>
+                  <span v-else-if="!canContinueAfterVideo" class="font-bold text-white">Reproduce el video hasta acumular al menos 10 segundos.</span>
                   <span v-else class="font-bold text-white">Video completado. Ya puedes continuar.</span>
                 </p>
-                <button type="button" :disabled="!videoDone || loading || questions.length === 0" class="page-control min-h-12 rounded-[var(--radius-control)] bg-white px-6 py-3 text-sm font-semibold text-[#202020] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eeeeed] disabled:cursor-not-allowed disabled:opacity-50" @click="start">
-                  {{ loading ? 'Preparando evaluación…' : questions.length ? 'Contestar evaluación' : 'Cuestionario pendiente' }}
-                </button>
+                <div class="flex flex-col gap-3 sm:flex-row">
+                  <button
+                    v-if="videoDone && !canContinueAfterVideo"
+                    type="button"
+                    class="page-control min-h-12 rounded-[var(--radius-control)] border border-white/50 px-5 py-3 text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-white/10"
+                    @click="replayVideo"
+                  >
+                    Reproducir nuevamente
+                  </button>
+                  <button type="button" :disabled="!canContinueAfterVideo || loading || questions.length === 0" class="page-control min-h-12 rounded-[var(--radius-control)] bg-white px-6 py-3 text-sm font-semibold text-[#202020] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#eeeeed] disabled:cursor-not-allowed disabled:opacity-50" @click="start">
+                    {{ loading ? 'Preparando evaluación…' : questions.length ? 'Contestar evaluación' : 'Cuestionario pendiente' }}
+                  </button>
+                </div>
               </div>
             </main>
           </div>
@@ -346,12 +504,12 @@ onBeforeUnmount(() => {
 
       <section v-if="stage === 'exam'" class="mx-auto max-w-4xl">
         <header class="rounded-[var(--radius-card)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)] sm:p-6">
-          <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0 flex-1">
               <p class="text-sm font-semibold text-[var(--color-accent)]">Módulo {{ moduleId }} · Evaluación</p>
               <h1 class="mt-1 max-w-2xl text-lg font-bold leading-6 text-[var(--color-brand-950)] sm:text-xl">{{ names[moduleId] }}</h1>
             </div>
-            <p class="shrink-0 rounded-lg bg-[var(--color-paper)] px-3 py-2 text-sm font-semibold tabular-nums text-[var(--color-brand-900)]">Pregunta {{ current + 1 }} de {{ questions.length }}</p>
+            <p class="self-start shrink-0 rounded-lg bg-[var(--color-paper)] px-3 py-2 text-sm font-semibold tabular-nums text-[var(--color-brand-900)]">Pregunta {{ current + 1 }} de {{ questions.length }}</p>
           </div>
           <div class="mt-5 flex flex-wrap items-center justify-between gap-2 text-sm">
             <span class="font-medium text-[var(--color-brand-900)]">{{ answeredCount }} de {{ questions.length }} contestadas</span>
@@ -397,7 +555,7 @@ onBeforeUnmount(() => {
               v-for="(item, index) in questions"
               :key="item.id"
               type="button"
-              :disabled="index > maxReachableIndex || savingAnswer"
+              :disabled="index > maxReachableIndex || savingAnswer || savingProgress"
               :aria-label="`Pregunta ${index + 1}${answers[item.id] != null ? ', contestada' : ', pendiente'}`"
               :aria-current="index === current ? 'step' : undefined"
               class="question-index min-h-11 min-w-11 rounded-[var(--radius-control)] border px-2 text-sm font-semibold tabular-nums disabled:cursor-not-allowed disabled:opacity-50"
@@ -407,14 +565,14 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="flex flex-col-reverse gap-3 border-t border-[var(--color-line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <button type="button" :disabled="current === 0 || savingAnswer" aria-label="Pregunta anterior" class="page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-brand-700)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-brand-900)] disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--color-brand-100)]" @click="previous">
+            <button type="button" :disabled="current === 0 || savingAnswer || savingProgress" aria-label="Pregunta anterior" class="page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-brand-700)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-brand-900)] disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--color-brand-100)]" @click="previous">
               <ChevronLeft :size="18" aria-hidden="true" /> Anterior
             </button>
 
-            <button v-if="canNext" type="button" :disabled="savingAnswer" class="page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-brand-900)] px-5 py-2 text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--color-brand-800)] disabled:cursor-wait disabled:opacity-50" @click="next">
+            <button v-if="canNext" type="button" :disabled="savingAnswer || savingProgress" class="page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-brand-900)] px-5 py-2 text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--color-brand-800)] disabled:cursor-wait disabled:opacity-50" @click="next">
               Siguiente pregunta <ChevronRight :size="18" aria-hidden="true" />
             </button>
-            <button v-else-if="allAnswered && current === maxReachableIndex" type="button" :disabled="loading || savingAnswer" aria-label="Finalizar evaluación" class="page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-brand-900)] px-5 py-2 text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--color-brand-800)] disabled:cursor-wait disabled:opacity-50" @click="finish">
+            <button v-else-if="allAnswered && current === maxReachableIndex" type="button" :disabled="loading || savingAnswer || savingProgress" aria-label="Finalizar evaluación" class="page-control inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-brand-900)] px-5 py-2 text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--color-brand-800)] disabled:cursor-wait disabled:opacity-50" @click="finish">
               {{ loading ? 'Finalizando…' : 'Finalizar' }} <CheckCircle2 :size="18" aria-hidden="true" />
             </button>
             <span v-else class="text-center text-sm text-[var(--color-muted)] sm:text-right">Selecciona una respuesta para avanzar.</span>

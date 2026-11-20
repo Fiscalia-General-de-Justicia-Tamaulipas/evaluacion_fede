@@ -39,14 +39,14 @@ describe('generateCourseCertificate', () => {
     const textDraws = vi.spyOn(PDFPage.prototype, 'drawText');
     const imageDraws = vi.spyOn(PDFPage.prototype, 'drawImage');
     await generateCourseCertificate({
-      folio: 'FEDE-2026-0123456789ABCDEF',
+      folio: 'FEDE-2026-0123456789ABCDEFFEDCBA9876543210',
       user_name: 'Ada López Pérez',
       course_name: 'Delitos Electorales y su investigación en el Sistema Electoral Mexicano',
       issued_at: '2026-11-19T17:00:00Z',
     });
 
     expect(fetch).toHaveBeenCalledWith('/constancia-template.pdf');
-    expect(anchor.download).toBe('constancia-FEDE-2026-0123456789ABCDEF.pdf');
+    expect(anchor.download).toBe('constancia-FEDE-2026-0123456789ABCDEFFEDCBA9876543210.pdf');
     expect(anchor.href).toBe('blob:constancia');
     expect(anchor.click).toHaveBeenCalledOnce();
     expect(anchor.remove).toHaveBeenCalledOnce();
@@ -58,8 +58,8 @@ describe('generateCourseCertificate', () => {
     const xObjects = pdf.getPages()[0].node.Resources().lookup(PDFName.of('XObject'), PDFDict);
     expect(xObjects.keys()).toHaveLength(6);
     expect(textDraws.mock.calls.map(([text]) => text)).toEqual([
-      'Ada López Pérez',
-      'FEDE-2026-0123456789ABCDEF',
+      'ADA LÓPEZ PÉREZ',
+      '0123456789ABCDEFFEDCBA9876543210',
     ]);
     const [nameText, nameOptions] = textDraws.mock.calls[0];
     expect(nameOptions.size).toBeCloseTo(32 * (612 / 768));

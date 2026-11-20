@@ -64,4 +64,34 @@ describe('acceso secuencial a módulos', () => {
     expect(wrapper.findAll('article').every(card => card.find('button').element.disabled)).toBe(true);
     expect(wrapper.text()).toContain('Curso completo');
   });
+
+  it('keeps a failed 10 percent attempt from marking the module as passed', async () => {
+    mockStatus(moduleStatuses.map(module => {
+      if (module.module_id === 1) {
+        return {
+          ...module,
+          attempts: 1,
+          attempts_remaining: 2,
+          best_score: 10,
+          passed: false,
+          available: true,
+        };
+      }
+
+      return {
+        ...module,
+        passed: false,
+        available: false,
+      };
+    }));
+
+    const wrapper = mount(ModulePanelView);
+    await flushPromises();
+    const cards = wrapper.findAll('article');
+
+    expect(cards[0].text()).not.toContain('Ya acreditado');
+    expect(cards[0].find('button').element.disabled).toBe(false);
+    expect(cards[1].find('button').element.disabled).toBe(true);
+    expect(wrapper.text()).not.toContain('Curso completo');
+  });
 });

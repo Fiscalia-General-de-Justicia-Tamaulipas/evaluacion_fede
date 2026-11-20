@@ -55,11 +55,7 @@ onMounted(loadStatus);
 
     <main id="main-content" tabindex="-1" class="relative z-10 mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
       <header class="course-catalog-intro max-w-3xl">
-        <p class="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-[var(--color-muted)]">
-          <span aria-hidden="true" class="h-px w-7 bg-[var(--color-brand-900)]" />
-          Capacitación institucional
-        </p>
-        <h1 class="mt-3 text-3xl font-bold leading-tight tracking-tight text-[var(--color-brand-950)] sm:text-4xl">Cursos disponibles</h1>
+        <h1 class="mt-3 text-3xl font-bold leading-tight tracking-tight text-[var(--color-brand-950)] sm:text-4xl">Capacitación institucional</h1>
         <p class="mt-3 max-w-2xl text-base leading-7 text-[var(--color-muted)]">Hola, {{ fullName }}. Elige un curso para consultar sus módulos y continuar tu capacitación.</p>
       </header>
 
@@ -73,7 +69,7 @@ onMounted(loadStatus);
         <div class="mb-5 flex flex-wrap items-end justify-between gap-3 sm:mb-6">
           <div>
             <p class="text-xs font-bold uppercase tracking-[0.13em] text-[var(--color-muted)]">Formación profesional</p>
-            <h2 id="courses-heading" class="mt-1 text-xl font-bold text-[var(--color-brand-950)] sm:text-2xl">Tu catálogo de cursos</h2>
+            <h2 id="courses-heading" class="mt-1 text-2xl font-bold text-[var(--color-brand-950)] sm:text-3xl">Cursos disponibles</h2>
           </div>
           <p class="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-muted)]">
             {{ courses.length }} {{ courses.length === 1 ? 'curso disponible' : 'cursos disponibles' }}
@@ -118,9 +114,8 @@ onMounted(loadStatus);
                     <div class="course-progress__value h-full rounded-full bg-[var(--color-brand-900)]" :style="{ width: `${loading ? 0 : courseProgress(course)}%` }" />
                   </div>
                 </div>
-
                 <button type="button" class="course-card__action page-control page-press mt-5 inline-flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--color-brand-700)] bg-[var(--color-surface)] px-4 py-3 text-sm font-semibold text-[var(--color-brand-900)] hover:bg-[var(--color-brand-100)]" @click="emit('select-course')">
-                  Cursar este curso
+                  Entrar
                   <ArrowRight :size="17" aria-hidden="true" />
                 </button>
               </div>

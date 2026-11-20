@@ -7,8 +7,8 @@ export type AuthUser = {
   first_name: string;
   paternal_surname: string;
   maternal_surname: string;
-  email: string;
-  curp: string;
+  email?: string;
+  curp?: string;
   full_name?: string;
   institution?: Institution;
   sector?: { id: number; name: string } | null;
@@ -21,15 +21,27 @@ const USER_KEY = 'fede_exam_user';
 
 function readStoredUser(): AuthUser | null {
   try {
-    const stored = localStorage.getItem(USER_KEY);
+    const stored = sessionStorage.getItem(USER_KEY);
+    if (!stored) {
+      const legacy = localStorage.getItem(USER_KEY);
+      if (legacy) localStorage.removeItem(USER_KEY);
+    }
     return stored ? JSON.parse(stored) as AuthUser : null;
   } catch {
-    localStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(USER_KEY);
     return null;
   }
 }
 
-const token = ref<string | null>(localStorage.getItem(TOKEN_KEY));
+let storedToken = sessionStorage.getItem(TOKEN_KEY);
+if (!storedToken) {
+  storedToken = localStorage.getItem(TOKEN_KEY);
+  if (storedToken) {
+    sessionStorage.setItem(TOKEN_KEY, storedToken);
+  }
+  localStorage.removeItem(TOKEN_KEY);
+}
+const token = ref<string | null>(storedToken);
 const user = ref<AuthUser | null>(readStoredUser());
 
 const isAuthenticated = computed(() => !!token.value);
@@ -42,14 +54,17 @@ const fullName = computed(() =>
 
 function persist(nextToken: string, nextUser: AuthUser) {
   token.value = nextToken;
-  user.value = nextUser;
-  localStorage.setItem(TOKEN_KEY, nextToken);
-  localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+  const { id, first_name, paternal_surname, maternal_surname, institution, sector } = nextUser;
+  user.value = { id, first_name, paternal_surname, maternal_surname, institution, sector };
+  sessionStorage.setItem(TOKEN_KEY, nextToken);
+  sessionStorage.setItem(USER_KEY, JSON.stringify(user.value));
 }
 
 function clear() {
   token.value = null;
   user.value = null;
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
 }
@@ -178,8 +193,22 @@ async function resetPassword(token: string, newPassword: string) {
 }
 
 
-function logout() {
+async function logout() {
+  const bearer = token.value;
   clear();
+  if (bearer) {
+    try {
+      await fetch(`${API}/api/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${bearer}`,
+        },
+      });
+    } catch {
+      // El cierre local debe seguir funcionando ante una caída de red.
+    }
+  }
 }
 
 export function useAuth() {

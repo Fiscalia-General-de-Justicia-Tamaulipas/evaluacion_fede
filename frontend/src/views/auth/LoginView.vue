@@ -160,13 +160,13 @@ async function onSubmit() {
 
         <div class="relative z-10 max-w-xl px-12 pb-20 xl:px-16">
           <p
-            class="mb-5 text-[11px] font-bold uppercase tracking-[0.24em] text-white/45"
+            class="mb-5 text-[30px] font-bold uppercase tracking-[0.24em] text-white/45"
           >
             Plataforma de capacitación
           </p>
 
           <h2
-            class="max-w-lg text-4xl font-semibold leading-[1.08] tracking-[-0.03em] text-white xl:text-[52px]"
+            class="max-w-lg text-2xl font-semibold leading-[1.08] tracking-[-0.03em] text-white xl:text-[40px]"
           >
             Fiscalía Especializada
             <br />

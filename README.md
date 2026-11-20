@@ -33,8 +33,10 @@ Guarda el resultado en `.env` y no lo compartas ni lo incluyas en el repositorio
 ## Arranque
 
 ```bash
-docker compose up --build
+docker compose --profile local up --build
 ```
+
+El perfil `local` inicia MySQL en Docker para desarrollo. En producción, no actives ese perfil: configura `DATABASE_URL` con la dirección de la instancia MySQL remota y asegúrate de que el servidor de aplicación pueda conectarse a ella. Limita la conexión entrante de MySQL a la IP/red del servidor de aplicación, usa una cuenta de mínimo privilegio y habilita TLS con validación del certificado si el proveedor lo soporta.
 
 Abrir `http://localhost:5173`.
 

@@ -1,18 +1,36 @@
 services:
+  db:
+    image: mysql:8.4
+    profiles:
+      - local
+    container_name: evaluacion_fede_db
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   api:
     build: ./backend
     container_name: evaluacion_fede_api
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: ${DATABASE_URL:?Configura DATABASE_URL para la base de datos}
       CORS_ORIGINS: ${CORS_ORIGINS}
     volumes:
       - ./backend:/app
       - ./.env:/app/.env:ro
     ports:
       - "8004:8000"
-
   frontend:
     build: ./frontend
     container_name: evaluacion_fede_frontend
@@ -28,3 +46,6 @@ services:
       - api
     ports:
       - "5174:5173"
+
+volumes:
+  mysql_data:

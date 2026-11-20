@@ -13,17 +13,16 @@ import {
   UserRound,
 } from 'lucide-vue-next';
 import InstitutionalHeader from '../../components/layout/InstitutionalHeader.vue';
+import { formatCertificateFolio, formatCertificateName } from '../../lib/certificate-format';
 
 type Verification = {
   valid: boolean;
   message: string;
   folio: string;
   issued_at: string;
-  user: {
-    full_name: string;
-    municipality: string | null;
-    sector: string | null;
-  };
+  user_name: string;
+  municipality: string | null;
+  sector: string | null;
   course: {
     name: string;
   };
@@ -222,7 +221,7 @@ watch(() => props.folio, loadVerification);
                       class="page-control inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-2 text-xs font-semibold text-[var(--color-brand-900)] hover:bg-[var(--color-surface)] disabled:cursor-wait disabled:opacity-60"
                       aria-label="Copiar folio de constancia"
                       :disabled="copyingTarget !== null"
-                      @click="copyValue(verification.folio, 'folio')"
+                      @click="copyValue(formatCertificateFolio(verification.folio), 'folio')"
                     >
                       <Check v-if="copiedTarget === 'folio'" :size="15" aria-hidden="true" />
                       <Copy v-else :size="15" aria-hidden="true" />
@@ -230,7 +229,7 @@ watch(() => props.folio, loadVerification);
                     </button>
                   </div>
                   <dd class="mt-2 font-mono text-sm font-semibold leading-6 text-[var(--color-brand-950)] [overflow-wrap:anywhere]">
-                    {{ verification.folio }}
+                    {{ formatCertificateFolio(verification.folio) }}
                   </dd>
                 </div>
 
@@ -243,30 +242,29 @@ watch(() => props.folio, loadVerification);
                 </div>
               </dl>
 
-              <section class="mt-6 rounded-lg border border-[var(--color-line)] p-4 sm:p-5" aria-labelledby="certificate-person">
+              <section class="mt-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-paper)] p-4 sm:p-5" aria-labelledby="certificate-person">
                 <div class="flex items-start gap-3">
-                  <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-paper)] text-[var(--color-brand-900)]">
+                  <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface)] text-[var(--color-brand-900)]">
                     <UserRound :size="19" aria-hidden="true" />
                   </span>
-                  <div class="min-w-0 flex-1">
+                  <div class="min-w-0">
                     <p class="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-muted)]">Persona acreditada</p>
                     <h4 id="certificate-person" class="mt-1 text-lg font-bold leading-6 text-[var(--color-brand-950)] [overflow-wrap:anywhere]">
-                      {{ verification.user.full_name }}
+                      {{ formatCertificateName(verification.user_name) }}
                     </h4>
-
-                    <dl v-if="verification.user.municipality || verification.user.sector" class="mt-4 flex flex-wrap gap-x-6 gap-y-3">
-                      <div v-if="verification.user.municipality" class="flex items-start gap-2">
+                    <dl v-if="verification.municipality || verification.sector" class="mt-4 flex flex-wrap gap-x-6 gap-y-3">
+                      <div v-if="verification.municipality" class="flex items-start gap-2">
                         <MapPin :size="15" class="mt-0.5 shrink-0 text-[var(--color-muted)]" aria-hidden="true" />
                         <div>
                           <dt class="text-xs font-semibold text-[var(--color-muted)]">Municipio</dt>
-                          <dd class="mt-0.5 text-sm font-medium text-[var(--color-brand-950)]">{{ verification.user.municipality }}</dd>
+                          <dd class="mt-0.5 text-sm font-medium text-[var(--color-brand-950)]">{{ verification.municipality }}</dd>
                         </div>
                       </div>
-                      <div v-if="verification.user.sector" class="flex items-start gap-2">
+                      <div v-if="verification.sector" class="flex items-start gap-2">
                         <span class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border border-[var(--color-brand-700)]" aria-hidden="true" />
                         <div>
                           <dt class="text-xs font-semibold text-[var(--color-muted)]">Sector</dt>
-                          <dd class="mt-0.5 text-sm font-medium text-[var(--color-brand-950)]">{{ verification.user.sector }}</dd>
+                          <dd class="mt-0.5 text-sm font-medium text-[var(--color-brand-950)]">{{ verification.sector }}</dd>
                         </div>
                       </div>
                     </dl>

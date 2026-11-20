@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import hashlib
+import re
 from html import escape
 import logging
 import os
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from secrets import SystemRandom, token_urlsafe
+from secrets import SystemRandom, compare_digest, token_urlsafe
 from urllib.parse import urlencode
 from urllib.request import Request as URLRequest, urlopen
 from urllib.error import URLError, HTTPError
@@ -90,7 +91,7 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv(
         "ACCESS_TOKEN_EXPIRE_MINUTES",
-        "1440",
+        "60",
     )
 )
 
@@ -105,14 +106,21 @@ PASSWORD_RESET_EXPIRE_MINUTES = int(os.getenv("PASSWORD_RESET_EXPIRE_MINUTES", "
 
 
 def score_percentage(value: int | None) -> int | None:
-    """Normaliza calificaciones históricas de escala 0–10 a 0–100."""
     if value is None:
         return None
-    score = int(value)
-    return score * 10 if 0 <= score <= 10 else score
+    return int(value)
+
+
+def evaluation_percentage(evaluation: Evaluation) -> int | None:
+    if evaluation.correct_answers is not None and evaluation.total_questions > 0:
+        return round(
+            (evaluation.correct_answers / evaluation.total_questions) * 100
+        )
+    return score_percentage(evaluation.score)
 
 
 PASSING_SCORE = 70
+QUESTIONS_PER_EXAM = 10
 COURSE_KEY = "delitos-electorales-investigacion-sistema-electoral-mexicano"
 COURSE_NAME = "Delitos Electorales y su investigación en el Sistema Electoral Mexicano"
 COURSE_MODULE_IDS = (1, 2, 3)
@@ -464,6 +472,13 @@ class User(Base):
         nullable=False,
     )
 
+    token_version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
     # --------------------------------------------------------
     # Municipio
     # --------------------------------------------------------
@@ -624,6 +639,24 @@ class PasswordResetToken(Base):
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(), nullable=False, index=True)
+
+
+class AuthSecurityState(Base):
+    __tablename__ = "auth_security_states"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scope: Mapped[str] = mapped_column(String(32), nullable=False)
+    identifier: Mapped[str] = mapped_column(String(255), nullable=False)
+    failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "scope",
+            "identifier",
+            name="uq_auth_security_scope_identifier",
+        ),
+    )
 
 
 # ============================================================
@@ -790,6 +823,22 @@ class Evaluation(Base):
 
     question_order: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True,
+    )
+
+    active_attempt_key: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        unique=True,
+    )
+
+    video_session_nonce: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
+    video_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
     )
 
@@ -1167,9 +1216,7 @@ def seed_profile_catalogs() -> None:
 
 def seed_questions() -> None:
     """
-    Inserta las preguntas únicamente si la tabla está vacía.
-
-    Si ya tienes preguntas en producción, NO las modifica.
+    Inserta el banco inicial solo cuando está vacío; no reemplaza preguntas existentes.
     """
 
     with SessionLocal() as db:
@@ -1186,115 +1233,86 @@ def seed_questions() -> None:
             {
                 "number": 1,
                 "text": (
-                    "¿Qué se entiende por delito electoral?"
+                    "¿Cuál es la característica del voto que implica que "
+                    "todo ciudadano debe votar de acuerdo con su preferencia "
+                    "política, o en favor del candidato, candidata o partido "
+                    "político que elija sin coacción o presión de ningún tipo?"
                 ),
                 "options": [
-                    (
-                        "A",
-                        "Una conducta prevista por la ley que afecta "
-                        "el adecuado desarrollo de los procesos electorales.",
-                        True,
-                    ),
-                    (
-                        "B",
-                        "Cualquier desacuerdo entre partidos políticos.",
-                        False,
-                    ),
-                    (
-                        "C",
-                        "Una infracción exclusivamente administrativa.",
-                        False,
-                    ),
-                    (
-                        "D",
-                        "Una opinión emitida durante una campaña.",
-                        False,
-                    ),
+                    ("A", "Universal", False),
+                    ("B", "Voto libre", True),
+                    ("C", "Intransferible", False),
                 ],
             },
             {
                 "number": 2,
                 "text": (
-                    "¿Qué institución organiza las elecciones "
-                    "locales en Tamaulipas?"
+                    "¿Cuál es la Autoridad Electoral encargada de organizar "
+                    "las elecciones federales?"
                 ),
                 "options": [
-                    (
-                        "A",
-                        "La Fiscalía General de Justicia.",
-                        False,
-                    ),
+                    ("A", "Instituto Electoral de Tamaulipas (IETAM)", False),
                     (
                         "B",
-                        "El Instituto Electoral de Tamaulipas.",
-                        True,
+                        "Tribunal Electoral del Estado de Tamaulipas (TRIELTAM)",
+                        False,
                     ),
                     (
                         "C",
-                        "El Tribunal Electoral.",
+                        "Fiscalía Especializada en Delitos Electorales de Tamaulipas. (FEDE)",
                         False,
                     ),
-                    (
-                        "D",
-                        "La Secretaría de Seguridad Pública.",
-                        False,
-                    ),
+                    ("D", "Instituto Nacional Electoral (INE)", True),
                 ],
             },
             {
                 "number": 3,
                 "text": (
-                    "¿Qué autoridad jurisdiccional resuelve "
-                    "controversias electorales locales?"
+                    "¿Cuál es la Autoridad Electoral que tiene como principales "
+                    "atribuciones, resolver las impugnaciones y controversias "
+                    "sobre elecciones federales así como realizar el cómputo "
+                    "final, calificar la legalidad y declarar al presidente "
+                    "electo de México?"
                 ),
                 "options": [
                     (
                         "A",
-                        "El Tribunal Electoral de Tamaulipas.",
-                        True,
+                        "Tribunal Electoral del Estado de Tamaulipas (TRIELTAM)",
+                        False,
                     ),
                     (
                         "B",
-                        "La Fiscalía Especializada.",
+                        "Fiscalía Especializada en Materia de Delitos Electorales de la FGR (FISEL)",
                         False,
                     ),
                     (
                         "C",
-                        "El Congreso de la Unión.",
-                        False,
-                    ),
-                    (
-                        "D",
-                        "La Secretaría de Gobernación.",
-                        False,
+                        "Tribunal Electoral del Poder Judicial de la Federación (TEPJF)",
+                        True,
                     ),
                 ],
             },
             {
                 "number": 4,
                 "text": (
-                    "¿Qué derecho permite a la ciudadanía "
-                    "participar mediante la emisión del voto?"
+                    "Es la Autoridad Electoral que tiene como principal "
+                    "atribución atender e investigar los delitos en materia "
+                    "electoral del fuero federal."
                 ),
                 "options": [
                     (
                         "A",
-                        "Derecho de petición.",
+                        "Tribunal Electoral del Estado de Tamaulipas (TRIELTAM)",
                         False,
                     ),
                     (
                         "B",
-                        "Derecho de asociación.",
-                        False,
-                    ),
-                    (
-                        "C",
-                        "Derecho al sufragio.",
+                        "Fiscalía Especializada en Materia de Delitos Electorales de la Fiscalía General de la República (FGR)",
                         True,
                     ),
                     (
-                        "D",
-                        "Derecho de audiencia.",
+                        "C",
+                        "Fiscalía Especializada en Delitos Electorales de la Fiscalía General de Justicia del Estado de Tamaulipas (FEDE)",
                         False,
                     ),
                 ],
@@ -1302,176 +1320,80 @@ def seed_questions() -> None:
             {
                 "number": 5,
                 "text": (
-                    "¿Cuál es una característica del voto "
-                    "en el sistema electoral mexicano?"
+                    "¿Cuál de los siguientes cargos de elección popular no "
+                    "corresponde a un proceso electoral local?"
                 ),
                 "options": [
-                    (
-                        "A",
-                        "Es público y obligatorio para todas las personas.",
-                        False,
-                    ),
-                    (
-                        "B",
-                        "Es universal, libre, secreto y directo.",
-                        True,
-                    ),
-                    (
-                        "C",
-                        "Es exclusivo para servidores públicos.",
-                        False,
-                    ),
-                    (
-                        "D",
-                        "Es determinado por los partidos políticos.",
-                        False,
-                    ),
+                    ("A", "Gobernador.", False),
+                    ("B", "Alcaldes y Regidurías.", False),
+                    ("C", "Presidente de la República.", True),
+                    ("D", "Diputado Local.", False),
                 ],
             },
             {
                 "number": 6,
                 "text": (
-                    "¿Qué autoridad investiga los delitos "
-                    "electorales de competencia federal?"
+                    "¿A qué mecanismo de protección de la democracia pertenecen "
+                    "las Fiscalías Especializadas en Delitos Electorales?"
                 ),
                 "options": [
-                    (
-                        "A",
-                        "La FEDE.",
-                        True,
-                    ),
-                    (
-                        "B",
-                        "El INE exclusivamente.",
-                        False,
-                    ),
-                    (
-                        "C",
-                        "El Congreso del Estado.",
-                        False,
-                    ),
-                    (
-                        "D",
-                        "El Tribunal Electoral local.",
-                        False,
-                    ),
+                    ("A", "Mecanismos Administrativos.", False),
+                    ("B", "Mecanismos Jurisdiccionales.", False),
+                    ("C", "Mecanismos de Procuración de Justicia.", True),
                 ],
             },
             {
                 "number": 7,
                 "text": (
-                    "¿Qué debe garantizar una investigación "
-                    "de un posible delito electoral?"
+                    "Es la herramienta mediante la cual se ejerce la democracia, "
+                    "y es el pueblo en su conjunto quien ejerce su soberanía "
+                    "eligiendo a sus gobernantes mediante elecciones periódicas."
                 ),
                 "options": [
-                    (
-                        "A",
-                        "La imparcialidad y el respeto al debido proceso.",
-                        True,
-                    ),
-                    (
-                        "B",
-                        "La preferencia por un partido político.",
-                        False,
-                    ),
-                    (
-                        "C",
-                        "La publicidad de todos los datos personales.",
-                        False,
-                    ),
-                    (
-                        "D",
-                        "La eliminación de la presunción de inocencia.",
-                        False,
-                    ),
+                    ("A", "El derecho de huelga.", False),
+                    ("B", "El voto.", True),
+                    ("C", "La consulta popular.", False),
                 ],
             },
             {
                 "number": 8,
                 "text": (
-                    "¿Qué es el proceso electoral?"
+                    "Es la característica del voto que consiste en que cada "
+                    "ciudadano o ciudadana debe votar sin ser observado u observada."
                 ),
                 "options": [
-                    (
-                        "A",
-                        "El conjunto de actos realizados para "
-                        "la renovación periódica de los cargos de elección popular.",
-                        True,
-                    ),
-                    (
-                        "B",
-                        "Únicamente la jornada electoral.",
-                        False,
-                    ),
-                    (
-                        "C",
-                        "El periodo de campañas exclusivamente.",
-                        False,
-                    ),
-                    (
-                        "D",
-                        "El proceso interno de los partidos.",
-                        False,
-                    ),
+                    ("A", "Personal.", False),
+                    ("B", "Libre.", False),
+                    ("C", "Secreto.", True),
                 ],
             },
             {
                 "number": 9,
                 "text": (
-                    "¿Qué conducta puede constituir un delito "
-                    "electoral cuando se condiciona un servicio "
-                    "público a cambio del voto?"
+                    "Es el tipo de Proceso Electoral, mediante el cual se eligen "
+                    "cargos públicos de elección popular federales como lo son "
+                    "Presidente de la República, Diputados Federales y Senadores."
                 ),
                 "options": [
-                    (
-                        "A",
-                        "Una conducta sin consecuencias jurídicas.",
-                        False,
-                    ),
-                    (
-                        "B",
-                        "Una conducta que puede constituir un delito electoral.",
-                        True,
-                    ),
-                    (
-                        "C",
-                        "Una actividad exclusivamente partidista.",
-                        False,
-                    ),
-                    (
-                        "D",
-                        "Una actividad administrativa ordinaria.",
-                        False,
-                    ),
+                    ("A", "Proceso Electoral Federal.", True),
+                    ("B", "Proceso Electoral Local.", False),
+                    ("C", "Proceso Electoral Concurrente.", False),
                 ],
             },
             {
                 "number": 10,
                 "text": (
-                    "¿Qué principio busca que las personas "
-                    "puedan ejercer su voto sin presión o coacción?"
+                    "De conformidad con lo establecido en la Ley General de "
+                    "Instituciones y Procedimientos Electorales, ¿cómo se "
+                    "denomina al conjunto de reuniones públicas, asambleas, "
+                    "marchas y, en general, actos en los cuales las personas "
+                    "precandidatas se dirigen a sus afiliados, simpatizantes o "
+                    "al electorado para obtener su respaldo?"
                 ),
                 "options": [
-                    (
-                        "A",
-                        "Secreto y libertad del voto.",
-                        True,
-                    ),
-                    (
-                        "B",
-                        "Publicidad del voto.",
-                        False,
-                    ),
-                    (
-                        "C",
-                        "Dependencia jerárquica.",
-                        False,
-                    ),
-                    (
-                        "D",
-                        "Discrecionalidad electoral.",
-                        False,
-                    ),
+                    ("A", "Actos de Precampaña", True),
+                    ("B", "Veda electoral", False),
+                    ("C", "Actos de Campaña", False),
                 ],
             },
         ]
@@ -1510,7 +1432,7 @@ def seed_questions() -> None:
 def seed_module2_questions() -> None:
     module2_questions = [
         (
-            "De conformidad con lo previsto en el Artículo 14 ter del Código Penal del Estado de Tamaulipas, es entendido como la conducta típica, antijuridica y culpable a la que se le atribuyen una o varias sanciones penales.",
+            "De conformidad con lo previsto en el artículo 14 ter del Código Penal del Estado de Tamaulipas, el delito es la conducta típica, antijurídica y culpable a la que se atribuye una o varias sanciones penales.",
             ["La culpabilidad", "El derecho penal.", "El delito"],
             "C",
         ),
@@ -1520,43 +1442,131 @@ def seed_module2_questions() -> None:
             "A",
         ),
         (
-            "Solicitar votos por paga, promesa de dinero u otra contraprestación, durante la campaña electoral, el día de la jornada electoral o en los tres días previos a la misma, corresponde a un delito electoral ¿cuál es el elemento temporal que exige esta descripción?",
+            "Solicitar votos por paga, promesa de dinero u otra contraprestación durante la campaña electoral, el día de la jornada electoral o en los tres días previos a esta corresponde a un delito electoral. ¿Cuál es el elemento temporal que exige esta descripción?",
             ["que exista un pago de por medio.", "que la conducta se lleve a cabo durante la campaña electoral, el día de la jornada electoral o tres días previos a la misma.", "que exista una promesa previa de pago."],
             "B",
         ),
         (
-            "De la interpretación de la fracción IV del numeral 11 de la Ley General en Materia de Delitos Electorales, los servidores públicos solamente tienen permitido asistir a eventos proselitistas como lo son precampañas y campañas electorales fuera de sus horarios laborales, siempre y cuando no utilizan vehículos oficiales, o uniforme institucional.",
-            ["verdadero", "falso"],
-            "A",
-        ),
-        (
-            "De los siguientes delitos electorales ¿cuáles admiten prisión preventiva oficiosa?",
+            "¿Cuáles de los siguientes delitos electorales admiten prisión preventiva oficiosa?",
             ["traslado/acarreo de votantes.", "uso de programas sociales con fines electorales.", "compra de votos."],
             "B",
         ),
         (
-            "Que autoridad electoral en material penal será competente para conocer de un delito electoral, cuando existen indicios suficientes para establecer el financiamiento indebido de alguna campaña electoral proveniente de la Delincuencia Organizada.",
-            ["Fiscalía Especializada en Materia de Delitos Electorales (FISEL) de la FGR.", "Fiscalía Especializa en Delitos Electorales de Tamaulipas (FEDE) de la FGJ.", "Unidad Técnica de Fiscalización del INE."],
+            "¿Qué autoridad electoral en materia penal será competente para conocer de un delito electoral cuando existan indicios suficientes de financiamiento indebido de una campaña electoral proveniente de la delincuencia organizada?",
+            ["Fiscalía Especializada en Materia de Delitos Electorales (FISEL) de la FGR.", "Fiscalía Especializada en Delitos Electorales de Tamaulipas (FEDE) de la FGJ.", "Unidad Técnica de Fiscalización del INE."],
             "A",
         ),
         (
-            "¿Cuál es la autoridad electoral que será competente de conocer de un delito electoral que surge en el contexto de una elección de Alcaldías y Diputaciones locales, como pudiera ser la utilización de vehículos del ayuntamiento para asistir a actos de campaña?",
+            "¿Cuál es la autoridad electoral competente para conocer de un delito electoral surgido en una elección de alcaldías y diputaciones locales, como el uso de vehículos del ayuntamiento para asistir a actos de campaña?",
             ["Fiscalía Especializada en Materia de Delitos Electorales (FISEL) de la FGR", "Fiscalía Especializada en Delitos Electorales de Tamaulipas (FEDE)", "Tribunal Electoral del Poder Judicial de la Federación."],
             "B",
         ),
         (
-            "¿Cuál es la característica del voto que se trasgrede cuando una persona pretende votar con una credencial que no le pertenece?",
+            "¿Cuál es la característica del voto que se transgrede cuando una persona pretende votar con una credencial que no le pertenece?",
             ["intransferible", "secreto", "libre"],
             "A",
         ),
         (
-            "¿Cuál es la principio constitucional que se trasgrede cuando se alteran los resultados electorales, o se introducen boletas previamente marcadas en favor de algún partido político o candidato.",
+            "¿Cuál es el principio constitucional que se transgrede cuando se alteran los resultados electorales o se introducen boletas previamente marcadas en favor de algún partido político o candidato?",
             ["oralidad y publicidad.", "lealtad, objetividad y buena fe.", "elecciones libres, auténticas y periódicas"],
             "C",
         ),
         (
-            "¿Cuál es el principio que garantiza condiciones de igualdad real y justicia para todos los partidos políticos y candidatos? Este principio busca que ningún participante tenga ventajas indebidas que afecten los resultados de la elección y se trasgrede cuando se destinan bienes o servicios públicos en beneficio de un candidato o partido politico.",
+            "¿Cuál es el principio que garantiza condiciones de igualdad real y justicia para todos los partidos políticos y candidatos? Este principio busca que ningún participante tenga ventajas indebidas que afecten los resultados de la elección y se transgrede cuando se destinan bienes o servicios públicos en beneficio de un candidato o partido político.",
             ["equidad en la contienda", "máxima publicidad", "oralidad"],
+            "A",
+        ),
+        (
+            "¿De cuántos artículos se compone la Ley General en Materia de Delitos Electorales?",
+            ["30", "70", "26"],
+            "C",
+        ),
+        (
+            "¿Quiénes tienen prohibido asistir a eventos partidistas con uniforme oficial institucional o en vehículos oficiales?",
+            [
+                "Servidores públicos.",
+                "Candidatos.",
+                "Representantes de Partido Político.",
+            ],
+            "A",
+        ),
+        (
+            "¿Cuáles son las características de los delitos electorales?",
+            [
+                "Graves, de querella, culposos.",
+                "Administrativos, sancionadores",
+                "De oficio, no graves, dolosos.",
+            ],
+            "C",
+        ),
+        (
+            "¿En qué Ley se encuentran previstos los delitos electorales?",
+            [
+                "Código Penal del Estado de Tamaulipas.",
+                "Ley General en Materia de Delitos Electorales",
+                "Ley General de Instituciones y Procedimientos Electorales",
+            ],
+            "B",
+        ),
+        (
+            "En el procedimiento administrativo sancionador pueden ser sancionados los partidos políticos, precandidatos y candidatos, candidaturas independientes, personas físicas y morales, personas extranjeras y concesionarios de radio y televisión (artículo 422 de la LGIPE).",
+            ["Verdadero", "Falso"],
+            "A",
+        ),
+        (
+            "¿Cuáles son las consecuencias que tiene la comisión de un delito electoral?",
+            [
+                "amonestación, disculpas públicas, multa, retiro de candidaturas.",
+                "pena de prisión / suspensión o inhabilitación para ocupar cargos públicos.",
+                "pena de muerte.",
+            ],
+            "B",
+        ),
+        (
+            "¿Cuáles son las consecuencias que tiene la comisión de una falta administrativa en materia electoral?",
+            [
+                "Prisión de 2 a 6 años, suspensión de derechos políticos.",
+                "Prisión preventiva, destitución definitiva de cargos públicos.",
+                "amonestación, disculpas públicas, multa, retiro de candidaturas.",
+            ],
+            "C",
+        ),
+        (
+            "¿Ante qué autoridad se denuncian los delitos electorales en Tamaulipas?",
+            [
+                "Instituto Electoral de Tamaulipas.",
+                "Tribunal Electoral del Estado de Tamaulipas",
+                "Fiscalía Especializada en Delitos Electorales de Tamaulipas.",
+            ],
+            "C",
+        ),
+        (
+            "Los delitos electorales federales y locales se encuentran contenidos en la misma Ley General en Materia de Delitos Electorales.",
+            ["Verdadero", "Falso"],
+            "A",
+        ),
+        (
+            "¿Cuál es la autoridad electoral competente para conocer de un delito electoral que surge en el contexto de una elección de Senadores y Diputados Federales?",
+            [
+                "Fiscalía Especializada en Materia de Delitos Electorales (FISEL) de la FGR",
+                "Fiscalía Especializada en Delitos Electorales de Tamaulipas (FEDE)",
+                "Tribunal Electoral del Poder Judicial de la Federación.",
+            ],
+            "A",
+        ),
+        (
+            "¿Cuál es la característica del voto que se transgrede cuando una persona solicita evidencia del sentido del voto, como podría ser mostrar una fotografía de la boleta marcada?",
+            ["intransferible", "secreto", "universal"],
+            "B",
+        ),
+        (
+            "¿Cuál es la característica del voto que se transgrede cuando una persona servidora pública obliga, presiona o amenaza a sus subordinados para que voten por un candidato o partido político en particular?",
+            ["universal", "libre", "secreto"],
+            "B",
+        ),
+        (
+            "De acuerdo con la redacción vigente del artículo 7, fracción VII, de la Ley General en Materia de Delitos Electorales, solamente se puede sancionar penalmente a quien solicita votos a cambio de dinero, pero no al ciudadano que vende su voto.",
+            ["Verdadero.", "Falso"],
             "A",
         ),
     ]
@@ -1594,7 +1604,7 @@ def seed_module2_questions() -> None:
 
 def seed_module3_questions() -> None:
     module3_questions = [
-        ("De conformidad a lo establecido en el Artículo 211 del Código Nacional de Procedimientos Penales, ¿de cuantas etapas se compone el Procedimiento Penal Acusatorio?",
+        ("De conformidad con lo establecido en el artículo 211 del Código Nacional de Procedimientos Penales, ¿de cuántas etapas se compone el procedimiento penal acusatorio?",
          ["Averiguación previa, instrucción y juicio.", "Inicial, intermedia y Juicio.", "Demanda, emplazamiento y audiencia constitucional."], "B"),
         ("¿Cómo inicia formalmente la etapa de investigación inicial?",
          ["Inicia con la presentación de la denuncia, querella o un requisito equivalente, o bien mediante el conocimiento directo que la autoridad (policía) tenga de un hecho con apariencia de delito.", "Inicia con la presentación de un escrito de acusación que realiza un Ministerio Público ante un Juez de Control, en el que debe especificar un hecho delictivo y las pruebas que pretende desahogar.", "Inicia con la presentación de los alegatos de apertura, para anticiparle al Tribunal de Enjuiciamiento lo que se desahogará en el Juicio."], "A"),
@@ -1610,9 +1620,9 @@ def seed_module3_questions() -> None:
          ["Averiguación previa.", "Informe policial homologado (IPH).", "Boleta de infracción."], "B"),
         ("De conformidad con lo previsto en la fracción segunda inciso b) del artículo 146 del Código Nacional de Procedimientos Penales, es la detención de una persona sin orden judicial realizada inmediatamente después de cometer un delito, cuando la persona detenida es señalada por la víctima u ofendido, un testigo presencial o quien hubiere intervenido con ella en la comisión del delito.",
          ["Flagrancia por señalamiento.", "Flagrancia por hallazgo de indicios o instrumentos del delito.", "Flagrancia por monitoreo de cámaras."], "A"),
-        ("De acuerdo con lo previsto en el numeral 21 de la Constitución Política de los Estados Unidos Mexicanos, es la autoridad encargada de investigar los delitos y perseguir a los responsables en nombre de la sociedad, forma parte de las Fiscalías Generales de Justicia (ya sea a nivel local en cada estado o a nivel federal) por lo tanto la Guardia Nacional y las Policías actúan bajo su conducción y mando en el ejercicio de esta función.",
+        ("De acuerdo con el artículo 21 de la Constitución Política de los Estados Unidos Mexicanos, ¿qué autoridad investiga los delitos y persigue a las personas responsables en nombre de la sociedad? La Guardia Nacional y las policías actúan bajo su conducción y mando en el ejercicio de esta función.",
          ["Policía Ministerial", "Ministerio Público", "Oficial Ministerial"], "B"),
-        ("¿Ante que autoridad se denuncian los delitos electorales en Tamaulipas, en el contexto de una elección local?",
+        ("¿Ante qué autoridad se denuncian los delitos electorales en Tamaulipas, en el contexto de una elección local?",
          ["Instituto Electoral de Tamaulipas.", "Tribunal Electoral del Estado de Tamaulipas.", "Fiscalía Especializada en Delitos Electorales de Tamaulipas."], "C"),
     ]
 
@@ -1647,6 +1657,131 @@ def seed_module3_questions() -> None:
         db.commit()
 
 
+QUESTION_TEXT_CORRECTIONS: dict[tuple[int, int], tuple[str, str]] = {
+    (1, 1): (
+        "¿Cuál es la característica del voto que implica que todo ciudadano debe votar de acuerdo con su preferencia política, o en favor del candidato, candidata o partido político que elija sin coacción o presión de ningún tipo.",
+        "¿Cuál es la característica del voto que implica que todo ciudadano debe votar de acuerdo con su preferencia política, o en favor del candidato, candidata o partido político que elija sin coacción o presión de ningún tipo?",
+    ),
+    (1, 5): (
+        "Cual de los siguientes cargos de elección popular no corresponde a un Proceso Electoral Local.",
+        "¿Cuál de los siguientes cargos de elección popular no corresponde a un proceso electoral local?",
+    ),
+    (1, 6): (
+        "A que mecanismo de protección de la democracia pertenecen las Fiscalías Especializadas en Delitos Electorales.",
+        "¿A qué mecanismo de protección de la democracia pertenecen las Fiscalías Especializadas en Delitos Electorales?",
+    ),
+    (1, 10): (
+        "De conformidad a lo establecido en la Ley General de Instituciones y Procedimientos Electorales, se entiende como el conjunto de reuniones públicas, asambleas, marchas y en general aquellos actos en los cuales los precandidatos a una candidatura se dirigen a los afiliados, simpatizantes o al electorado en general, con el objetivo de obtener su respaldo para ser postulado como candidato a un cargo de elección popular.",
+        "De conformidad con lo establecido en la Ley General de Instituciones y Procedimientos Electorales, ¿cómo se denomina al conjunto de reuniones públicas, asambleas, marchas y, en general, actos en los cuales las personas precandidatas se dirigen a sus afiliados, simpatizantes o al electorado para obtener su respaldo?",
+    ),
+    (2, 1): (
+        "De conformidad con lo previsto en el Artículo 14 ter del Código Penal del Estado de Tamaulipas, es entendido como la conducta típica, antijuridica y culpable a la que se le atribuyen una o varias sanciones penales.",
+        "De conformidad con lo previsto en el artículo 14 ter del Código Penal del Estado de Tamaulipas, el delito es la conducta típica, antijurídica y culpable a la que se atribuye una o varias sanciones penales.",
+    ),
+    (2, 3): (
+        "Solicitar votos por paga, promesa de dinero u otra contraprestación, durante la campaña electoral, el día de la jornada electoral o en los tres días previos a la misma, corresponde a un delito electoral ¿cuál es el elemento temporal que exige esta descripción?",
+        "Solicitar votos por paga, promesa de dinero u otra contraprestación durante la campaña electoral, el día de la jornada electoral o en los tres días previos a esta corresponde a un delito electoral. ¿Cuál es el elemento temporal que exige esta descripción?",
+    ),
+    (2, 4): (
+        "De los siguientes delitos electorales ¿cuáles admiten prisión preventiva oficiosa?",
+        "¿Cuáles de los siguientes delitos electorales admiten prisión preventiva oficiosa?",
+    ),
+    (2, 5): (
+        "Que autoridad electoral en material penal será competente para conocer de un delito electoral, cuando existen indicios suficientes para establecer el financiamiento indebido de alguna campaña electoral proveniente de la Delincuencia Organizada.",
+        "¿Qué autoridad electoral en materia penal será competente para conocer de un delito electoral cuando existan indicios suficientes de financiamiento indebido de una campaña electoral proveniente de la delincuencia organizada?",
+    ),
+    (2, 6): (
+        "¿Cuál es la autoridad electoral que será competente de conocer de un delito electoral que surge en el contexto de una elección de Alcaldías y Diputaciones locales, como pudiera ser la utilización de vehículos del ayuntamiento para asistir a actos de campaña?",
+        "¿Cuál es la autoridad electoral competente para conocer de un delito electoral surgido en una elección de alcaldías y diputaciones locales, como el uso de vehículos del ayuntamiento para asistir a actos de campaña?",
+    ),
+    (2, 7): (
+        "¿Cuál es la característica del voto que se trasgrede cuando una persona pretende votar con una credencial que no le pertenece?",
+        "¿Cuál es la característica del voto que se transgrede cuando una persona pretende votar con una credencial que no le pertenece?",
+    ),
+    (2, 8): (
+        "¿Cuál es la principio constitucional que se trasgrede cuando se alteran los resultados electorales, o se introducen boletas previamente marcadas en favor de algún partido político o candidato.",
+        "¿Cuál es el principio constitucional que se transgrede cuando se alteran los resultados electorales o se introducen boletas previamente marcadas en favor de algún partido político o candidato?",
+    ),
+    (2, 9): (
+        "¿Cuál es el principio que garantiza condiciones de igualdad real y justicia para todos los partidos políticos y candidatos? Este principio busca que ningún participante tenga ventajas indebidas que afecten los resultados de la elección y se trasgrede cuando se destinan bienes o servicios públicos en beneficio de un candidato o partido politico.",
+        "¿Cuál es el principio que garantiza condiciones de igualdad real y justicia para todos los partidos políticos y candidatos? Este principio busca que ningún participante tenga ventajas indebidas que afecten los resultados de la elección y se transgrede cuando se destinan bienes o servicios públicos en beneficio de un candidato o partido político.",
+    ),
+    (2, 10): (
+        "¿De cuantos artículos se compone la Ley General en Materia de Delitos Electorales?",
+        "¿De cuántos artículos se compone la Ley General en Materia de Delitos Electorales?",
+    ),
+    (2, 11): (
+        "¿Quienes tienen prohibido asistir a eventos partidistas con uniforme oficial institucional o en vehículos oficiales?",
+        "¿Quiénes tienen prohibido asistir a eventos partidistas con uniforme oficial institucional o en vehículos oficiales?",
+    ),
+    (2, 14): (
+        "En el procedimiento Administrativo Sancionador, pueden ser sancionados los Partidos Políticos, Precandidatos o Candidatos, candidatos independientes, personas físicas y morales, extranjeros, concesionarios de radio y televisión. (ART. 422 LGIPE)",
+        "En el procedimiento administrativo sancionador pueden ser sancionados los partidos políticos, precandidatos y candidatos, candidaturas independientes, personas físicas y morales, personas extranjeras y concesionarios de radio y televisión (artículo 422 de la LGIPE).",
+    ),
+    (2, 17): (
+        "¿Ante que autoridad se denuncian los delitos electorales en Tamaulipas?",
+        "¿Ante qué autoridad se denuncian los delitos electorales en Tamaulipas?",
+    ),
+    (2, 20): (
+        "¿Cuál es la característica del voto que se trasgrede cuando una persona solicita evidencia del sentido del voto, como pudiera ser es el mostrar fotografía de la boleta marcada?",
+        "¿Cuál es la característica del voto que se transgrede cuando una persona solicita evidencia del sentido del voto, como podría ser mostrar una fotografía de la boleta marcada?",
+    ),
+    (2, 21): (
+        "¿Cuál es la característica del voto que se trasgrede cuando un servidor público obliga, presiona o amenaza a sus subordinados a que voten por un candidato o partido político en particular?",
+        "¿Cuál es la característica del voto que se transgrede cuando una persona servidora pública obliga, presiona o amenaza a sus subordinados para que voten por un candidato o partido político en particular?",
+    ),
+    (2, 22): (
+        "De acuerdo con la redacción vigente del Artículo 7 fracción VII de la Ley General en Materia de Delitos Electorales, solamente se puede sancionar penalmente a quién solicita votos por paga (comprar), pero no al ciudadano que vende su voto (vender).",
+        "De acuerdo con la redacción vigente del artículo 7, fracción VII, de la Ley General en Materia de Delitos Electorales, solamente se puede sancionar penalmente a quien solicita votos a cambio de dinero, pero no al ciudadano que vende su voto.",
+    ),
+    (3, 1): (
+        "De conformidad a lo establecido en el Artículo 211 del Código Nacional de Procedimientos Penales, ¿de cuantas etapas se compone el Procedimiento Penal Acusatorio?",
+        "De conformidad con lo establecido en el artículo 211 del Código Nacional de Procedimientos Penales, ¿de cuántas etapas se compone el procedimiento penal acusatorio?",
+    ),
+    (3, 10): (
+        "¿Ante que autoridad se denuncian los delitos electorales en Tamaulipas, en el contexto de una elección local?",
+        "¿Ante qué autoridad se denuncian los delitos electorales en Tamaulipas, en el contexto de una elección local?",
+    ),
+}
+
+OPTION_TEXT_CORRECTIONS: dict[tuple[int, int, str], tuple[str, str]] = {
+    (2, 5, "B"): (
+        "Fiscalía Especializa en Delitos Electorales de Tamaulipas (FEDE) de la FGJ.",
+        "Fiscalía Especializada en Delitos Electorales de Tamaulipas (FEDE) de la FGJ.",
+    ),
+}
+
+
+def correct_seeded_question_texts() -> None:
+    with SessionLocal() as db:
+        changed = False
+        for (module_id, number), (legacy_text, corrected_text) in QUESTION_TEXT_CORRECTIONS.items():
+            question = db.scalar(
+                select(Question).where(
+                    Question.module_id == module_id,
+                    Question.number == number,
+                )
+            )
+            if question is not None and question.text == legacy_text:
+                question.text = corrected_text
+                changed = True
+        for (module_id, question_number, letter), (legacy_text, corrected_text) in OPTION_TEXT_CORRECTIONS.items():
+            option = db.scalar(
+                select(Option)
+                .join(Question, Question.id == Option.question_id)
+                .where(
+                    Question.module_id == module_id,
+                    Question.number == question_number,
+                    Option.letter == letter,
+                )
+            )
+            if option is not None and option.text == legacy_text:
+                option.text = corrected_text
+                changed = True
+        if changed:
+            db.commit()
+
+
 # ============================================================
 # MIGRACIONES LIGERAS
 # ============================================================
@@ -1663,6 +1798,17 @@ def ensure_user_profile_columns() -> None:
     }
 
     with engine.begin() as connection:
+
+        if "token_version" not in columns:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN token_version
+                    INT NOT NULL DEFAULT 0
+                    """
+                )
+            )
 
         if "municipality_other_state" not in columns:
             connection.execute(
@@ -1723,6 +1869,56 @@ def ensure_evaluation_columns() -> None:
     }
 
     with engine.begin() as connection:
+
+        if "active_attempt_key" not in columns:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE evaluations
+                    ADD COLUMN active_attempt_key VARCHAR(64) NULL
+                    """
+                )
+            )
+
+        constraints = inspect(engine).get_unique_constraints("evaluations")
+        if not any(
+            set(constraint.get("column_names") or []) == {"active_attempt_key"}
+            for constraint in constraints
+        ):
+            try:
+                connection.execute(
+                    text(
+                        "ALTER TABLE evaluations "
+                        "ADD CONSTRAINT uq_evaluation_active_attempt "
+                        "UNIQUE (active_attempt_key)"
+                    )
+                )
+            except Exception as exc:
+                print(
+                    "No se pudo crear la restricción única "
+                    "de evaluaciones activas:",
+                    exc,
+                )
+
+        if "video_session_nonce" not in columns:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE evaluations
+                    ADD COLUMN video_session_nonce VARCHAR(64) NULL
+                    """
+                )
+            )
+
+        if "video_started_at" not in columns:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE evaluations
+                    ADD COLUMN video_started_at DATETIME NULL
+                    """
+                )
+            )
 
         if "current_question" not in columns:
             connection.execute(
@@ -1786,6 +1982,7 @@ def get_evaluation_question_order(
     if not isinstance(order, list):
         order = []
 
+    has_saved_order = bool(evaluation.question_order)
     valid_question_ids = set(question_ids)
     order = list(dict.fromkeys(
         question_id
@@ -1793,13 +1990,8 @@ def get_evaluation_question_order(
         if type(question_id) is int
         and question_id in valid_question_ids
     ))
-    missing_ids = [
-        question_id
-        for question_id in question_ids
-        if question_id not in order
-    ]
 
-    if not evaluation.question_order:
+    if not has_saved_order:
         answered_ids = set(db.scalars(
             select(Answer.question_id)
             .where(Answer.evaluation_id == evaluation.id)
@@ -1809,16 +2001,45 @@ def get_evaluation_question_order(
             for question_id in question_ids
             if question_id in answered_ids
         ]
-        missing_ids = [
-            question_id
-            for question_id in question_ids
-            if question_id not in answered_ids
-        ]
 
+    if len(order) > QUESTIONS_PER_EXAM:
+        answered_ids = set(db.scalars(
+            select(Answer.question_id)
+            .where(Answer.evaluation_id == evaluation.id)
+        ).all())
+        previously_answered = [
+            question_id
+            for question_id in order
+            if question_id in answered_ids
+        ]
+        if len(previously_answered) > QUESTIONS_PER_EXAM:
+            order = SystemRandom().sample(
+                previously_answered,
+                QUESTIONS_PER_EXAM,
+            )
+        else:
+            remaining_ids = [
+                question_id
+                for question_id in question_ids
+                if question_id not in previously_answered
+            ]
+            order = previously_answered + SystemRandom().sample(
+                remaining_ids,
+                min(
+                    QUESTIONS_PER_EXAM - len(previously_answered),
+                    len(remaining_ids),
+                ),
+            )
+    missing_ids = [
+        question_id
+        for question_id in question_ids
+        if question_id not in order
+    ]
     SystemRandom().shuffle(missing_ids)
-    order.extend(missing_ids)
+    order.extend(missing_ids[:max(QUESTIONS_PER_EXAM - len(order), 0)])
 
     evaluation.question_order = json.dumps(order)
+    evaluation.total_questions = len(order)
     db.flush()
     return order
 
@@ -1963,6 +2184,8 @@ def initialize_database() -> None:
 
     seed_module3_questions()
 
+    correct_seeded_question_texts()
+
 
 # ============================================================
 # FASTAPI
@@ -2095,8 +2318,81 @@ def verify_password(
     )
 
 
+AUTH_FAILURE_LIMIT = 5
+AUTH_FAILURE_WINDOW_MINUTES = 15
+
+
+def auth_client_ip(request: Request) -> str:
+    if request.client and request.client.host:
+        return request.client.host[:255]
+    return "unknown"
+
+
+def _security_state(
+    db: Session,
+    scope: str,
+    identifier: str,
+):
+    return db.scalar(
+        select(AuthSecurityState).where(
+            AuthSecurityState.scope == scope,
+            AuthSecurityState.identifier == identifier,
+        )
+    )
+
+
+def check_auth_security(db: Session, scope: str, identifier: str) -> None:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    state = _security_state(db, scope, identifier)
+    if not state:
+        return
+
+    window_expires = state.window_started_at + timedelta(
+        minutes=AUTH_FAILURE_WINDOW_MINUTES
+    )
+    if window_expires <= now:
+        db.delete(state)
+        db.commit()
+        return
+
+    if state.failed_attempts >= AUTH_FAILURE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail="Demasiados intentos. Espera 15 minutos antes de volver a intentarlo.",
+        )
+
+
+def record_auth_failure(db: Session, scope: str, identifier: str) -> None:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    state = _security_state(db, scope, identifier)
+    if not state:
+        state = AuthSecurityState(
+            scope=scope,
+            identifier=identifier[:255],
+            failed_attempts=1,
+            window_started_at=now,
+        )
+        db.add(state)
+    else:
+        if state.window_started_at + timedelta(
+            minutes=AUTH_FAILURE_WINDOW_MINUTES
+        ) <= now:
+            state.failed_attempts = 1
+            state.window_started_at = now
+        else:
+            state.failed_attempts += 1
+    db.commit()
+
+
+def clear_auth_failures(db: Session, scope: str, identifier: str) -> None:
+    state = _security_state(db, scope, identifier)
+    if state:
+        db.delete(state)
+        db.commit()
+
+
 def create_access_token(
-    user_id: int,
+    user: User,
 ) -> str:
 
     expire = datetime.now(
@@ -2106,7 +2402,9 @@ def create_access_token(
     )
 
     payload = {
-        "sub": str(user_id),
+        "sub": str(user.id),
+        "tv": user.token_version,
+        "jti": uuid4().hex,
         "exp": expire,
     }
 
@@ -2137,8 +2435,15 @@ def get_current_user(
         )
 
         subject = payload.get("sub")
+        token_version = payload.get("tv")
 
         if not subject:
+            raise HTTPException(
+                status_code=401,
+                detail="Token inválido.",
+            )
+
+        if not isinstance(token_version, int):
             raise HTTPException(
                 status_code=401,
                 detail="Token inválido.",
@@ -2166,6 +2471,12 @@ def get_current_user(
         raise HTTPException(
             status_code=401,
             detail="Usuario no encontrado.",
+        )
+
+    if token_version != user.token_version:
+        raise HTTPException(
+            status_code=401,
+            detail="Sesión revocada.",
         )
 
     return user
@@ -2209,16 +2520,19 @@ class RegisterIn(BaseModel):
     first_name: str = Field(
         min_length=1,
         max_length=100,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
     )
 
     paternal_surname: str = Field(
         min_length=1,
         max_length=100,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
     )
 
     maternal_surname: str = Field(
         min_length=1,
         max_length=100,
+        pattern=r"^[^\x00-\x1F\x7F]+$",
     )
 
     email: EmailStr
@@ -2231,37 +2545,38 @@ class RegisterIn(BaseModel):
     curp: str = Field(
         min_length=18,
         max_length=18,
+        pattern=r"^[A-Z0-9]{18}$",
     )
 
-    state_id: int
+    state_id: int = Field(ge=1)
 
-    municipality_id: int
+    municipality_id: int = Field(ge=1)
 
-    municipality_other: str | None = None
+    municipality_other: str | None = Field(default=None, max_length=150)
 
-    municipality_other_state: str | None = None
+    municipality_other_state: str | None = Field(default=None, max_length=150)
 
-    gender_id: int | None = None
+    gender_id: int | None = Field(default=None, ge=1)
 
-    gender_other: str | None = None
+    gender_other: str | None = Field(default=None, max_length=100)
 
-    age_range_id: int | None = None
+    age_range_id: int | None = Field(default=None, ge=1)
 
-    occupation_id: int | None = None
+    occupation_id: int | None = Field(default=None, ge=1)
 
-    occupation_other: str | None = None
+    occupation_other: str | None = Field(default=None, max_length=150)
 
-    sector_id: int | None = None
+    sector_id: int | None = Field(default=None, ge=1)
 
-    indigenous_id: int | None = None
+    indigenous_id: int | None = Field(default=None, ge=1)
 
-    afro_mexican_id: int | None = None
+    afro_mexican_id: int | None = Field(default=None, ge=1)
 
-    disability_id: int | None = None
+    disability_id: int | None = Field(default=None, ge=1)
 
-    lgbtttiq_id: int | None = None
+    lgbtttiq_id: int | None = Field(default=None, ge=1)
 
-    education_level_id: int | None = None
+    education_level_id: int | None = Field(default=None, ge=1)
 
 
 class LoginIn(BaseModel):
@@ -2344,6 +2659,11 @@ class ProgressIn(BaseModel):
     current_question: int = Field(
         ge=0
     )
+
+
+class VideoCompletedIn(BaseModel):
+    nonce: str = Field(min_length=32, max_length=64)
+    played_seconds: float = Field(ge=10)
 
 
 # ============================================================
@@ -2600,6 +2920,18 @@ def register(
                 detail="Nivel educativo inválido.",
             )
 
+    for field_name, catalog_id in (
+        ("Indígena", data.indigenous_id),
+        ("Afrodescendiente", data.afro_mexican_id),
+        ("Discapacidad", data.disability_id),
+        ("LGBTTTIQ+", data.lgbtttiq_id),
+    ):
+        if catalog_id is not None and not db.get(YesNoOption, catalog_id):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Valor de {field_name} inválido.",
+            )
+
     user = User(
         first_name=data.first_name.strip(),
         paternal_surname=data.paternal_surname.strip(),
@@ -2690,9 +3022,15 @@ def send_password_reset_email(recipient: str, reset_url: str) -> bool:
 @app.post("/api/auth/password/forgot")
 def request_password_reset(
     data: PasswordResetRequestIn,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     email = str(data.email).strip().lower()
+    ip = auth_client_ip(request)
+    check_auth_security(db, "password-reset-ip", ip)
+    check_auth_security(db, "password-reset-email", email)
+    record_auth_failure(db, "password-reset-ip", ip)
+    record_auth_failure(db, "password-reset-email", email)
     user = db.scalar(select(User).where(User.email == email))
 
     if user:
@@ -2750,6 +3088,7 @@ def reset_password(
         raise HTTPException(status_code=400, detail="El enlace venció o ya fue utilizado. Solicita uno nuevo.")
 
     user.hashed_password = hash_password(data.new_password)
+    user.token_version += 1
     db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
     db.commit()
     return {"message": "Tu contraseña se actualizó. Ya puedes iniciar sesión."}
@@ -2760,10 +3099,14 @@ def reset_password(
 )
 def login(
     data: LoginIn,
+    request: Request,
     db: Session = Depends(get_db),
 ):
 
     email = data.email.strip().lower()
+    ip = auth_client_ip(request)
+    check_auth_security(db, "login-ip", ip)
+    check_auth_security(db, "login-email", email)
 
     user = db.scalar(
         select(User)
@@ -2773,6 +3116,8 @@ def login(
     )
 
     if not user:
+        record_auth_failure(db, "login-ip", ip)
+        record_auth_failure(db, "login-email", email)
         raise HTTPException(
             status_code=401,
             detail="Credenciales incorrectas.",
@@ -2782,13 +3127,18 @@ def login(
         data.password,
         user.hashed_password,
     ):
+        record_auth_failure(db, "login-ip", ip)
+        record_auth_failure(db, "login-email", email)
         raise HTTPException(
             status_code=401,
             detail="Credenciales incorrectas.",
         )
 
+    clear_auth_failures(db, "login-ip", ip)
+    clear_auth_failures(db, "login-email", email)
+
     token = create_access_token(
-        user.id
+        user
     )
 
     return {
@@ -2812,6 +3162,16 @@ def me(
     ),
 ):
     return current_user
+
+
+@app.post("/api/auth/logout")
+def logout(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.token_version += 1
+    db.commit()
+    return {"success": True}
 
 
 # ============================================================
@@ -2884,7 +3244,11 @@ def _module_statuses_for_user(db: Session, user_id: int) -> list[dict]:
             ).limit(1)
         ) is not None
         best_score = max(
-            (score_percentage(item.score) for item in completed if item.score is not None),
+            (
+                evaluation_percentage(item)
+                for item in completed
+                if evaluation_percentage(item) is not None
+            ),
             default=None,
         )
         passed = best_score is not None and best_score >= PASSING_SCORE
@@ -2964,7 +3328,8 @@ def _passing_course_evaluations(db: Session, user_id: int) -> dict[int, Evaluati
     ).all()
     passing: dict[int, Evaluation] = {}
     for evaluation in evaluations:
-        if score_percentage(evaluation.score) is not None and score_percentage(evaluation.score) >= PASSING_SCORE:
+        score = evaluation_percentage(evaluation)
+        if score is not None and score >= PASSING_SCORE:
             passing.setdefault(evaluation.module_id, evaluation)
     return passing
 
@@ -3033,6 +3398,12 @@ def verify_certificate(
     certificate = db.scalar(
         select(Certificate).where(Certificate.folio == folio)
     )
+    if not certificate and re.fullmatch(r"[A-Fa-f0-9]{32}", folio):
+        certificate = db.scalar(
+            select(Certificate).where(
+                Certificate.folio.endswith(f"-{folio.upper()}")
+            )
+        )
     if not certificate or certificate.course_key != COURSE_KEY:
         return {"valid": False, "message": "La constancia no es válida."}
 
@@ -3045,13 +3416,11 @@ def verify_certificate(
         "message": "La constancia es válida.",
         "folio": certificate.folio,
         "issued_at": certificate.issued_at,
-        "user": {
-            "full_name": certificate.user_name,
-            "municipality": user.municipality_other or (
-                user.municipality.name if user.municipality else None
-            ),
-            "sector": user.sector.name if user.sector else None,
-        },
+        "user_name": certificate.user_name,
+        "municipality": user.municipality_other or (
+            user.municipality.name if user.municipality else None
+        ),
+        "sector": user.sector.name if user.sector else None,
         "course": {
             "key": certificate.course_key,
             "name": COURSE_NAME,
@@ -3116,7 +3485,7 @@ def get_current_evaluation(
                 "question_order": [],
                 "answered_count": evaluation.correct_answers,
                 "total_questions": evaluation.total_questions,
-                "score": score_percentage(evaluation.score),
+                "score": evaluation_percentage(evaluation),
                 "correct": evaluation.correct_answers,
                 "attempt_number": evaluation.attempt_number,
                 "attempts_remaining": max(0, 3 - int(db.scalar(
@@ -3126,7 +3495,7 @@ def get_current_evaluation(
                         Evaluation.completed_at.is_not(None),
                     )
                 ) or 0)),
-                "passed": (score_percentage(evaluation.score) or 0) >= PASSING_SCORE,
+                "passed": (evaluation_percentage(evaluation) or 0) >= PASSING_SCORE,
                 "answers": [],
             },
         }
@@ -3227,6 +3596,15 @@ def start_evaluation(
     # --------------------------------------------------------
 
     if existing_evaluation:
+        if not existing_evaluation.active_attempt_key:
+            existing_evaluation.active_attempt_key = (
+                f"{current_user.id}:{module_id}"
+            )
+        if not existing_evaluation.video_session_nonce:
+            existing_evaluation.video_session_nonce = token_urlsafe(24)
+            existing_evaluation.video_started_at = datetime.now(timezone.utc).replace(
+                tzinfo=None
+            )
 
         had_question_order = bool(
             existing_evaluation.question_order
@@ -3267,6 +3645,9 @@ def start_evaluation(
             "video_completed":
                 existing_evaluation.video_completed,
 
+            "video_session_nonce":
+                existing_evaluation.video_session_nonce,
+
             "current_question":
                 existing_evaluation.current_question,
 
@@ -3294,20 +3675,20 @@ def start_evaluation(
     # NUEVA EVALUACIÓN
     # --------------------------------------------------------
 
-    total_questions = db.scalar(
-        select(text("COUNT(*)"))
-        .select_from(Question)
+    question_pool = db.scalars(
+        select(Question.id)
         .where(Question.module_id == module_id)
-    )
-
-    total_questions = int(
-        total_questions or 0
-    )
-
-    if total_questions == 0:
+        .order_by(Question.number)
+    ).all()
+    if not question_pool:
         raise HTTPException(
             status_code=500,
             detail="No existen preguntas configuradas.",
+        )
+    if len(question_pool) < QUESTIONS_PER_EXAM:
+        raise HTTPException(
+            status_code=500,
+            detail="No hay suficientes preguntas configuradas para el examen.",
         )
 
     completed_attempts = db.scalar(
@@ -3321,8 +3702,8 @@ def start_evaluation(
     )
     completed_attempts = int(completed_attempts or 0)
 
-    previous_scores = db.scalars(
-        select(Evaluation.score)
+    previous_evaluations = db.scalars(
+        select(Evaluation)
         .where(
             Evaluation.user_id == current_user.id,
             Evaluation.module_id == module_id,
@@ -3330,7 +3711,7 @@ def start_evaluation(
         )
     ).all()
     best_score = max(
-        (score_percentage(score) or 0 for score in previous_scores),
+        (evaluation_percentage(item) or 0 for item in previous_evaluations),
         default=None,
     )
     if best_score is not None and best_score >= PASSING_SCORE:
@@ -3344,12 +3725,10 @@ def start_evaluation(
             detail="Has agotado los 3 intentos disponibles para este módulo.",
         )
 
-    question_order = db.scalars(
-        select(Question.id)
-        .where(Question.module_id == module_id)
-        .order_by(Question.number)
-    ).all()
-    SystemRandom().shuffle(question_order)
+    question_order = SystemRandom().sample(
+        question_pool,
+        k=QUESTIONS_PER_EXAM,
+    )
 
     evaluation = Evaluation(
         user_id=current_user.id,
@@ -3358,15 +3737,24 @@ def start_evaluation(
         started_at=datetime.now(
             timezone.utc
         ),
-        total_questions=total_questions,
+        total_questions=len(question_order),
         video_completed=False,
         current_question=0,
         question_order=json.dumps(question_order),
+        active_attempt_key=f"{current_user.id}:{module_id}",
+        video_session_nonce=token_urlsafe(24),
+        video_started_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
 
     db.add(evaluation)
-
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Ya existe una evaluación activa para este módulo.",
+        )
 
     db.refresh(evaluation)
 
@@ -3379,6 +3767,9 @@ def start_evaluation(
 
         "video_completed":
             False,
+
+        "video_session_nonce":
+            evaluation.video_session_nonce,
 
         "current_question":
             0,
@@ -3405,6 +3796,7 @@ def start_evaluation(
 )
 def mark_video_completed(
     evaluation_id: int,
+    data: VideoCompletedIn,
     db: Session = Depends(get_db),
     current_user: User = Depends(
         get_current_user
@@ -3434,6 +3826,34 @@ def mark_video_completed(
         raise HTTPException(
             status_code=409,
             detail="La evaluación ya fue finalizada.",
+        )
+
+    if not evaluation.video_session_nonce or not compare_digest(
+        evaluation.video_session_nonce,
+        data.nonce,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="La sesión de video no es válida.",
+        )
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    started_at = evaluation.video_started_at
+    if not started_at:
+        raise HTTPException(
+            status_code=400,
+            detail="La sesión de video no fue iniciada.",
+        )
+
+    elapsed_seconds = max(0.0, (now - started_at).total_seconds())
+    if (
+        elapsed_seconds + 1 < data.played_seconds
+        or elapsed_seconds < 10
+        or data.played_seconds < 10
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Completa la reproducción antes de continuar.",
         )
 
     evaluation.video_completed = True
@@ -3545,6 +3965,11 @@ def save_answer(
         db,
         evaluation,
     )
+    if question.id not in question_order:
+        raise HTTPException(
+            status_code=400,
+            detail="La pregunta no forma parte de esta evaluación.",
+        )
 
     existing_answer = db.scalar(
         select(Answer)
@@ -3730,15 +4155,8 @@ def finish_evaluation(
     # PREGUNTAS
     # --------------------------------------------------------
 
-    questions_list = db.scalars(
-        select(Question)
-        .where(Question.module_id == evaluation.module_id)
-        .order_by(Question.number)
-    ).all()
-
-    total = len(
-        questions_list
-    )
+    question_order = get_evaluation_question_order(db, evaluation)
+    total = len(question_order)
 
     if total == 0:
         raise HTTPException(
@@ -3769,17 +4187,16 @@ def finish_evaluation(
     # --------------------------------------------------------
 
     unanswered = [
-        question.number
-        for question in questions_list
-        if question.id
-        not in answers_by_question
+        position
+        for position, question_id in enumerate(question_order, start=1)
+        if question_id not in answers_by_question
     ]
 
     if unanswered:
         raise HTTPException(
             status_code=400,
             detail=(
-                "Debes responder todas las preguntas. "
+                "Debes responder todas las preguntas visibles. "
                 "Preguntas pendientes: "
                 + ", ".join(
                     map(
@@ -3794,11 +4211,11 @@ def finish_evaluation(
     # CALCULAR
     # --------------------------------------------------------
 
-    correct = sum(
-        1
-        for answer in answers
-        if answer.is_correct
-    )
+    selected_answers = [
+        answers_by_question[question_id]
+        for question_id in question_order
+    ]
+    correct = sum(answer.is_correct for answer in selected_answers)
 
     score = round((correct / total) * 100)
 
@@ -3815,6 +4232,9 @@ def finish_evaluation(
     evaluation.completed_at = (
         datetime.now(timezone.utc)
     )
+    evaluation.active_attempt_key = None
+    evaluation.video_session_nonce = None
+    evaluation.video_started_at = None
 
     db.commit()
 

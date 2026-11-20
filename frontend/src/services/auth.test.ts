@@ -4,6 +4,7 @@ import { extractErrorMessage, useAuth } from './auth';
 describe('auth service', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     useAuth().logout();
   });
 
@@ -22,7 +23,10 @@ describe('auth service', () => {
     const auth = useAuth();
     await auth.login(user.email, 'secret');
     expect(auth.isAuthenticated.value).toBe(true);
-    expect(localStorage.getItem('fede_exam_token')).toBe('token-123');
+    expect(sessionStorage.getItem('fede_exam_token')).toBe('token-123');
+    expect(localStorage.getItem('fede_exam_token')).toBeNull();
+    expect(JSON.parse(sessionStorage.getItem('fede_exam_user') || '{}')).not.toHaveProperty('curp');
+    expect(JSON.parse(sessionStorage.getItem('fede_exam_user') || '{}')).not.toHaveProperty('email');
     await auth.apiFetch('/api/modules/status');
     expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject({ Authorization: 'Bearer token-123' });
     await auth.apiFetch('/api/modules/status');

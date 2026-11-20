@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import CertificateVerificationView from './CertificateVerificationView.vue';
 
 const folio = 'FEDE-2026-6195656D09A246F882365FA5FB62F99D';
+const displayFolio = '6195656D09A246F882365FA5FB62F99D';
 const clipboardWrite = vi.fn().mockResolvedValue(undefined);
 
 describe('CertificateVerificationView', () => {
@@ -14,11 +15,9 @@ describe('CertificateVerificationView', () => {
       message: 'La constancia es válida.',
       folio,
       issued_at: '2026-11-19T17:00:00Z',
-      user: {
-        full_name: 'Jhovan Rodriguez Moreno',
-        municipality: 'Victoria',
-        sector: 'Fiscalías',
-      },
+      user_name: 'Jhovan Rodríguez Moreno',
+      municipality: 'Victoria',
+      sector: 'Fiscalías',
       course: {
         name: 'Delitos Electorales y su investigación en el Sistema Electoral Mexicano',
       },
@@ -34,13 +33,16 @@ describe('CertificateVerificationView', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Constancia válida');
-    expect(wrapper.text()).toContain('Jhovan Rodriguez Moreno');
-    expect(wrapper.text()).toContain(folio);
+    expect(wrapper.text()).toContain(displayFolio);
+    expect(wrapper.text()).not.toContain('FEDE-2026-');
+    expect(wrapper.text()).toContain('JHOVAN RODRÍGUEZ MORENO');
+    expect(wrapper.text()).toContain('Victoria');
+    expect(wrapper.text()).toContain('Fiscalías');
 
     await wrapper.get('button[aria-label="Copiar folio de constancia"]').trigger('click');
     await flushPromises();
 
-    expect(clipboardWrite).toHaveBeenCalledWith(folio);
+    expect(clipboardWrite).toHaveBeenCalledWith(displayFolio);
     expect(wrapper.text()).toContain('Folio copiado.');
   });
 });
