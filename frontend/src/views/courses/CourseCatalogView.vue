@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { ArrowRight, BookOpen, CheckCircle2 } from 'lucide-vue-next';
+import { ArrowRight, BookOpen, CheckCircle2, ClipboardList } from 'lucide-vue-next';
 import InstitutionalHeader from '../../components/layout/InstitutionalHeader.vue';
 import BaseAlert from '../../components/ui/BaseAlert.vue';
 import { useAuth } from '../../services/auth';
+import CourseStudyPlanDialog from './CourseStudyPlanDialog.vue';
 
 type ModuleStatus = {
   module_id: number;
@@ -15,11 +16,14 @@ const { apiFetch, fullName, logout } = useAuth();
 const modules = ref<ModuleStatus[]>([]);
 const loading = ref(true);
 const error = ref('');
+const studyPlanCourse = ref<string | null>(null);
 
 const courses = [{
   key: 'delitos-electorales-investigacion-sistema-electoral-mexicano',
-  title: 'Delitos Electorales y su investigación en el Sistema Electoral Mexicano',
+  title: 'Delitos Electorales y su Investigación en el Sistema Electoral Mexicano',
   description: 'Capacitación sobre el marco electoral, la investigación de delitos y la cultura de prevención.',
+  speaker: 'Mtro. Francisco Ibarra Torres',
+  speakerRole: 'Titular de la Unidad Especializada en la Investigación de Delitos Electorales de la Fiscalía Especializada en Delitos Electorales de Tamaulipas',
   moduleIds: [1, 2, 3],
 }];
 
@@ -29,6 +33,10 @@ function completedModules(course: (typeof courses)[number]) {
 
 function courseProgress(course: (typeof courses)[number]) {
   return Math.round((completedModules(course) / course.moduleIds.length) * 100);
+}
+
+function closeStudyPlan() {
+  studyPlanCourse.value = null;
 }
 
 async function loadStatus() {
@@ -103,6 +111,11 @@ onMounted(loadStatus);
                 </div>
               </div>
               <p class="mt-3 text-sm leading-6 text-[var(--color-muted)]">{{ course.description }}</p>
+              <div class="mt-4 border-l-2 border-[var(--color-line)] pl-3">
+                <p class="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--color-muted)]">Ponente</p>
+                <p class="mt-1 text-sm font-semibold text-[var(--color-brand-950)]">{{ course.speaker }}</p>
+                <p class="mt-1 text-sm leading-5 text-[var(--color-muted)]">{{ course.speakerRole }}</p>
+              </div>
 
               <div class="mt-auto pt-7">
                 <div class="rounded-lg border border-[var(--color-line)] bg-[var(--color-paper)] p-4">
@@ -114,12 +127,26 @@ onMounted(loadStatus);
                     <div class="course-progress__value h-full rounded-full bg-[var(--color-brand-900)]" :style="{ width: `${loading ? 0 : courseProgress(course)}%` }" />
                   </div>
                 </div>
+                <button
+                  type="button"
+                  class="page-control mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-[var(--color-brand-900)] hover:bg-[var(--color-paper)]"
+                  @click="studyPlanCourse = course.key"
+                >
+                  <ClipboardList :size="17" aria-hidden="true" />
+                  Plan de estudio
+                </button>
                 <button type="button" class="course-card__action page-control page-press mt-5 inline-flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--color-brand-700)] bg-[var(--color-surface)] px-4 py-3 text-sm font-semibold text-[var(--color-brand-900)] hover:bg-[var(--color-brand-100)]" @click="emit('select-course')">
                   Entrar
                   <ArrowRight :size="17" aria-hidden="true" />
                 </button>
               </div>
             </div>
+            <CourseStudyPlanDialog
+              v-if="studyPlanCourse === course.key"
+              :model-value="true"
+              :course-title="course.title"
+              @update:model-value="closeStudyPlan"
+            />
           </article>
         </div>
       </section>

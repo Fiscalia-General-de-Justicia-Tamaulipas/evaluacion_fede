@@ -1535,7 +1535,7 @@ onUnmounted(() => {
 
 
                     <h1 class="mt-4 max-w-3xl text-2xl font-bold leading-tight tracking-tight text-[var(--color-brand-950)] sm:text-3xl lg:text-4xl">
-                        Nociones básicas de derecho electoral
+                        Generalidades del Derecho Electoral.
 
                     </h1>
 
@@ -1639,7 +1639,7 @@ onUnmounted(() => {
                         <main class="flex flex-1 flex-col items-center justify-center px-4 py-8 md:px-10 md:py-12">
                             <div class="mb-6 w-full max-w-6xl text-left md:mb-8">
                                 <p class="text-xl font-bold leading-tight md:text-3xl">
-                                    Módulo 1: Nociones básicas de derecho electoral
+                                    Módulo 1: Generalidades del Derecho Electoral.
                                 </p>
                                 <p class="mt-2 text-sm leading-6 text-white/75 md:text-base">
                                     Reproduce el video completo antes de contestar la evaluación.
@@ -1710,7 +1710,7 @@ onUnmounted(() => {
                         <div class="min-w-0 flex-1">
                         <p class="text-sm font-semibold text-[var(--color-accent)]">Módulo 1 · Evaluación</p>
                         <h1 class="mt-1 max-w-2xl text-lg font-bold leading-6 text-[var(--color-brand-950)] sm:text-xl">
-                            Nociones básicas de derecho electoral
+                            Generalidades del Derecho Electoral.
                         </h1>
                         </div>
 
@@ -1850,7 +1850,7 @@ onUnmounted(() => {
                  RESULT
             ==================================================== -->
 
-            <EvaluationResult v-else module-id="1" module-name="Nociones básicas de derecho electoral" :score="result.score" :correct="result.correct" :total="result.total" :attempt="result.attempt" :attempts-remaining="result.attemptsRemaining" :message="message" @retry="restart" @back="emit('back')" />
+            <EvaluationResult v-else module-id="1" module-name="Generalidades del Derecho Electoral." :score="result.score" :correct="result.correct" :total="result.total" :attempt="result.attempt" :attempts-remaining="result.attemptsRemaining" :message="message" @retry="restart" @back="emit('back')" />
 
         </main>
 

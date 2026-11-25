@@ -37,9 +37,9 @@ const courseCompleted = computed(() =>
 );
 
 const titles = [
-  'Nociones básicas de derecho electoral',
-  'Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales',
-  'Integración de la carpeta de investigación, primer respondiente, retos en la investigación y cultura de prevención',
+  'Generalidades del Derecho Electoral.',
+  'Análisis de los Delitos Electorales.',
+  'Integración de la Carpeta de Investigación, Primer respondiente, Retos en la Investigación y Cultura de Prevención',
 ];
 const courseTitle = 'Delitos Electorales y su investigación en el Sistema Electoral Mexicano';
 

@@ -15,9 +15,9 @@ type Option = { id: number; letter: string; text: string };
 type Question = { id: number; number: number; text: string; options: Option[] };
 
 const names: Record<number, string> = {
-  1: 'Nociones básicas de derecho electoral',
-  2: 'Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales',
-  3: 'Integración de la carpeta de investigación, primer respondiente, retos en la investigación y cultura de prevención',
+  1: 'Generalidades del Derecho Electoral.',
+  2: 'Análisis de los Delitos Electorales.',
+  3: 'Integración de la Carpeta de Investigación, Primer respondiente, Retos en la Investigación y Cultura de Prevención',
 };
 
 const stage = ref<'intro' | 'exam' | 'result'>('intro');

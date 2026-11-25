@@ -74,6 +74,7 @@ const form = ref({
   state_id: null as number | null,
   municipality_id: null as number | null,
   municipality_other: '',
+  municipality_other_state: '',
 
   gender_id: null as number | null,
   gender_other: '',
@@ -287,6 +288,7 @@ watch(
   (stateId) => {
     form.value.municipality_id = null;
     form.value.municipality_other = '';
+    form.value.municipality_other_state = '';
     void loadMunicipalities(stateId);
   }
 );
@@ -296,6 +298,7 @@ watch(
   () => {
     if (!isOtherMunicipality.value) {
       form.value.municipality_other = '';
+      form.value.municipality_other_state = '';
     }
   }
 );
@@ -358,6 +361,9 @@ function validateStep(stepIndex: number) {
     if (!form.value.municipality_id) return 'Selecciona tu municipio.';
     if (isOtherMunicipality.value && !form.value.municipality_other.trim()) {
       return 'Escribe el nombre del municipio.';
+    }
+    if (isOtherMunicipality.value && !form.value.municipality_other_state.trim()) {
+      return 'Escribe el nombre del estado.';
     }
     if (!form.value.gender_id) return 'Selecciona tu género.';
     if (isOtherGender.value && !form.value.gender_other.trim()) return 'Especifica tu género.';
@@ -454,7 +460,7 @@ async function onSubmit() {
         ? form.value.municipality_other.trim()
         : null,
       municipality_other_state: isOtherMunicipality.value
-        ? selectedState.value?.name ?? null
+        ? form.value.municipality_other_state.trim()
         : null,
 
       gender_id: form.value.gender_id,
@@ -1011,19 +1017,34 @@ async function onSubmit() {
                     v-if="isOtherMunicipality"
                     class="rounded-2xl border border-[#eeeeed] bg-[#fafafa] p-4"
                   >
-                    <label class="block">
-                      <span class="mb-2 block text-[12px] font-semibold text-[#555554]">
-                        Municipio
-                      </span>
-                      <input
-                        v-model="form.municipality_other"
-                        type="text"
-                        maxlength="150"
-                        :disabled="loading"
-                        placeholder="Escribe el municipio"
-                        class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035]"
-                      />
-                    </label>
+                    <div class="grid gap-4 md:grid-cols-2">
+                      <label class="block">
+                        <span class="mb-2 block text-[12px] font-semibold text-[#555554]">
+                          Otro municipio
+                        </span>
+                        <input
+                          v-model="form.municipality_other"
+                          type="text"
+                          maxlength="150"
+                          :disabled="loading"
+                          placeholder="Escribe el municipio"
+                          class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035]"
+                        />
+                      </label>
+                      <label class="block">
+                        <span class="mb-2 block text-[12px] font-semibold text-[#555554]">
+                          Estado
+                        </span>
+                        <input
+                          v-model="form.municipality_other_state"
+                          type="text"
+                          maxlength="150"
+                          :disabled="loading"
+                          placeholder="Escribe el estado"
+                          class="h-[48px] w-full rounded-xl border border-[#e1e1e0] bg-white px-4 text-sm outline-none [transition:background-color_150ms_var(--ease-out),border-color_150ms_var(--ease-out),color_150ms_var(--ease-out),opacity_150ms_var(--ease-out)] focus:border-[#4a4a49] focus:ring-4 focus:ring-black/[0.035]"
+                        />
+                      </label>
+                    </div>
                   </div>
                 </Transition>
 

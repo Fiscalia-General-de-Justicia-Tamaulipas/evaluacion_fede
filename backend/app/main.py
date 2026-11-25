@@ -122,7 +122,7 @@ def evaluation_percentage(evaluation: Evaluation) -> int | None:
 PASSING_SCORE = 70
 QUESTIONS_PER_EXAM = 10
 COURSE_KEY = "delitos-electorales-investigacion-sistema-electoral-mexicano"
-COURSE_NAME = "Delitos Electorales y su investigación en el Sistema Electoral Mexicano"
+COURSE_NAME = "Delitos Electorales y su Investigación en el Sistema Electoral Mexicano"
 COURSE_MODULE_IDS = (1, 2, 3)
 
 
@@ -973,6 +973,7 @@ TAMAULIPAS_MUNICIPALITIES = [
     "Victoria",
     "Villagrán",
     "Xicoténcatl",
+    "Otro",
 ]
 
 
@@ -1002,9 +1003,9 @@ SECTOR_NAMES = [
     "Secretaría de Seguridad Pública",
     "Secretaría de la Defensa Nacional",
     "Instituto Nacional Electoral",
-    "Institutos Electorales",
+    "Institutos Electorales (OPLES)",
     "Servidor Público",
-    "Funcionario de Casilla",
+    "Funcionario Partidista",
     "Comunidad Estudiantil",
     "Público en General",
 ]
@@ -1029,65 +1030,38 @@ EDUCATION_LEVEL_NAMES = [
 
 
 OCCUPATION_NAMES = [
-    "Abogado(a)",
-    "Administrador(a)",
-    "Agricultor(a)",
-    "Albañil",
-    "Analista",
-    "Arquitecto(a)",
-    "Artesano(a)",
-    "Artista",
-    "Asistente administrativo(a)",
-    "Auditor(a)",
-    "Comerciante",
-    "Contador(a)",
-    "Consultor(a)",
-    "Cocinero(a)",
-    "Diseñador(a)",
-    "Docente",
-    "Economista",
-    "Electricista",
-    "Enfermero(a)",
+    "Policía de Investigación",
+    "Cuerpos de vigilancia, custodia y seguridad",
+    "Guardia Estatal",
+    "Agente Sub Oficial",
+    "Personal Sustantivo",
+    "Personal Operativo",
+    "Vocal Ejecutivo",
+    "Vocal",
+    "Funcionario(a) de Casilla",
+    "Consejero(a) Distrital",
+    "Consejero(a) Presidente(a)",
+    "Consejero(a)",
+    "Consejero(a) Municipal",
+    "Jefe de Estado Mayor",
+    "Teniente",
+    "Subteniente",
+    "Agente",
+    "Sub-Agente",
+    "Sargento",
+    "Cabo",
+    "Soldado",
+    "Marinero",
+    "Guardia",
+    "Policía Militar",
     "Estudiante",
-    "Farmacéutico(a)",
-    "Fisioterapeuta",
-    "Fotógrafo(a)",
-    "Funcionario(a) público(a)",
-    "Ganadero(a)",
-    "Ingeniero(a)",
-    "Investigador(a)",
-    "Jornalero(a)",
-    "Maestro(a)",
-    "Médico(a)",
-    "Mesero(a)",
-    "Militar",
-    "Músico(a)",
-    "Odontólogo(a)",
-    "Operador(a)",
-    "Paramédico(a)",
+    "Abogado(a)",
     "Periodista",
-    "Policía",
-    "Programador(a)",
-    "Psicólogo(a)",
-    "Químico(a)",
-    "Recepcionista",
-    "Recursos humanos",
-    "Secretaria(o)",
-    "Sociólogo(a)",
-    "Técnico(a)",
-    "Trabajador(a) social",
-    "Transportista",
-    "Vendedor(a)",
-    "Veterinario(a)",
-    "Empresario(a)",
-    "Empleado(a) administrativo(a)",
-    "Empleado(a) de comercio",
-    "Empleado(a) de servicios",
-    "Trabajador(a) independiente",
-    "Ama/o de casa",
-    "Jubilado(a)",
-    "Pensionado(a)",
-    "Desempleado(a)",
+    "Delegado Federal",
+    "Representante de Partido",
+    "Organizador de Campaña",
+    "Dirigente Partidista",
+    "Militante Partidista",
     "Otro",
 ]
 
@@ -1163,9 +1137,21 @@ def seed_profile_catalogs() -> None:
                     Municipality(
                         state_id=tamaulipas.id,
                         name=municipality_name,
-                        is_other=False,
+                        is_other=(municipality_name == "Otro"),
                     )
                 )
+
+        other_municipality = db.scalar(
+            select(Municipality)
+            .where(
+                Municipality.state_id == tamaulipas.id,
+                Municipality.name == "Otro",
+            )
+        )
+        if other_municipality and not other_municipality.is_other:
+            other_municipality.is_other = True
+
+        db.commit()
 
         db.commit()
 
@@ -2756,6 +2742,7 @@ def get_occupations(
 ):
     return db.scalars(
         select(Occupation)
+        .where(Occupation.name.in_(OCCUPATION_NAMES))
         .order_by(Occupation.name)
     ).all()
 
@@ -2769,6 +2756,7 @@ def get_sectors(
 ):
     return db.scalars(
         select(Sector)
+        .where(Sector.name.in_(SECTOR_NAMES))
         .order_by(Sector.id)
     ).all()
 
@@ -2865,15 +2853,34 @@ def register(
             detail="El municipio seleccionado no corresponde al estado.",
         )
 
-    if data.gender_id is not None:
+    if municipality.is_other:
+        municipality_other = (data.municipality_other or "").strip()
+        municipality_other_state = (data.municipality_other_state or "").strip()
+        if not municipality_other:
+            raise HTTPException(
+                status_code=400,
+                detail="Escribe el nombre del municipio.",
+            )
+        if not municipality_other_state:
+            raise HTTPException(
+                status_code=400,
+                detail="Escribe el nombre del estado.",
+            )
 
-        if not db.get(
+    if data.gender_id is not None:
+        gender = db.get(
             Gender,
             data.gender_id,
-        ):
+        )
+        if not gender:
             raise HTTPException(
                 status_code=400,
                 detail="Género inválido.",
+            )
+        if gender.name == "Otro" and not (data.gender_other or "").strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Escribe cómo te identificas.",
             )
 
     if data.age_range_id is not None:
@@ -2888,14 +2895,19 @@ def register(
             )
 
     if data.occupation_id is not None:
-
-        if not db.get(
+        occupation = db.get(
             Occupation,
             data.occupation_id,
-        ):
+        )
+        if not occupation:
             raise HTTPException(
                 status_code=400,
                 detail="Ocupación inválida.",
+            )
+        if occupation.name == "Otro" and not (data.occupation_other or "").strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Escribe tu ocupación.",
             )
 
     if data.sector_id is not None:
@@ -3217,9 +3229,9 @@ def get_questions(
 
 def _module_statuses_for_user(db: Session, user_id: int) -> list[dict]:
     module_names = {
-        1: "Nociones básicas de derecho electoral",
-        2: "Delitos Electorales y su investigación en el Contexto de los Procesos Electorales Locales",
-        3: "Integración de la carpeta de investigación, primer respondiente, retos en la investigación y cultura de prevención",
+        1: "Generalidades del Derecho Electoral.",
+        2: "Análisis de los delitos electorales.",
+        3: "Integración de la Carpeta de Investigación, Primer respondiente, Retos en la Investigación y Cultura de Prevención.",
     }
     result = []
 

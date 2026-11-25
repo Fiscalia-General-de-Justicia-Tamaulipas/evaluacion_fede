@@ -4,7 +4,7 @@ import EvaluationResult from './EvaluationResult.vue';
 
 const defaults = {
   moduleId: 1,
-  moduleName: 'Nociones básicas de derecho electoral',
+  moduleName: 'Generalidades del Derecho Electoral.',
   correct: 4,
   total: 10,
   attempt: 1,
